@@ -8,597 +8,610 @@
 <title>Etiket Tarayıcı</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 
-  :root {
-    --bg: #0a0a0f;
-    --surface: #13131a;
-    --border: #2a2a3a;
-    --accent: #00e5ff;
-    --accent2: #ff6b35;
-    --green: #00ff88;
-    --text: #e8e8f0;
-    --muted: #6b6b80;
-    --danger: #ff4560;
-  }
+:root{
+  --bg:#060608;
+  --s1:#0d0d12;
+  --s2:#13131c;
+  --border:#1e1e2e;
+  --accent:#5b6ef5;
+  --accent-glow:rgba(91,110,245,0.3);
+  --green:#22d3a5;
+  --green-glow:rgba(34,211,165,0.25);
+  --amber:#f5a623;
+  --red:#f54b5e;
+  --text:#f0f0fa;
+  --muted:#4a4a6a;
+  --card:#0f0f18;
+}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Courier New', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Space Mono',monospace}
 
-  /* HEADER */
-  .header {
-    padding: 16px 20px 12px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-  }
-  .header h1 {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  .header .count-badge {
-    background: var(--accent);
-    color: var(--bg);
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-    letter-spacing: 1px;
-  }
+/* ── LAYOUT ── */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
 
-  /* CAMERA */
-  .camera-section {
-    position: relative;
-    width: 100%;
-    background: #000;
-  }
-  #video {
-    width: 100%;
-    max-height: 55vh;
-    object-fit: cover;
-    display: block;
-  }
+/* ── HEADER ── */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px 12px;
+  background:var(--s1);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  position:relative;
+  z-index:10;
+}
+.hdr-logo{
+  font-family:'Syne',sans-serif;
+  font-size:17px;font-weight:800;
+  letter-spacing:.5px;
+  background:linear-gradient(135deg,var(--accent),var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.pill{
+  font-size:10px;font-weight:700;letter-spacing:1.5px;
+  padding:4px 12px;border-radius:20px;
+  background:var(--s2);border:1px solid var(--border);
+  color:var(--muted);transition:all .3s;
+}
+.pill.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+.pill.ok{background:var(--green-glow);border-color:var(--green);color:var(--green)}
 
-  /* Scan overlay */
-  .scan-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  .scan-frame {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 82%;
-    height: 42%;
-    border: 2px solid var(--accent);
-    border-radius: 4px;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
-  }
-  .scan-frame::before,
-  .scan-frame::after {
-    content: '';
-    position: absolute;
-    width: 20px; height: 20px;
-    border-color: var(--accent);
-    border-style: solid;
-  }
-  .scan-frame::before { top: -2px; left: -2px; border-width: 3px 0 0 3px; }
-  .scan-frame::after  { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
+/* ── CAMERA WRAP ── */
+.cam-wrap{
+  position:relative;flex-shrink:0;
+  background:#000;overflow:hidden;
+}
+#video{width:100%;height:100%;object-fit:cover;display:block}
 
-  .scan-line {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 82%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    animation: scanMove 2s ease-in-out infinite;
-    top: 29%;
-  }
-  @keyframes scanMove {
-    0%   { top: 29%; opacity: 1; }
-    50%  { top: 71%; opacity: 0.7; }
-    100% { top: 29%; opacity: 1; }
-  }
+/* Viewfinder */
+.vf{position:absolute;inset:0;pointer-events:none}
+.vf-dark-top,.vf-dark-bot,.vf-dark-left,.vf-dark-right{
+  position:absolute;background:rgba(6,6,8,.55);
+}
+.vf-dark-top{top:0;left:0;right:0;height:20%}
+.vf-dark-bot{bottom:0;left:0;right:0;height:20%}
+.vf-dark-left{top:20%;bottom:20%;left:0;width:5%}
+.vf-dark-right{top:20%;bottom:20%;right:0;width:5%}
 
-  /* STATUS */
-  .status-bar {
-    padding: 10px 16px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 46px;
-  }
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    flex-shrink: 0;
-    transition: background 0.3s;
-  }
-  .status-dot.scanning { background: var(--accent); animation: pulse 1s infinite; }
-  .status-dot.ok       { background: var(--green); }
-  .status-dot.error    { background: var(--danger); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .status-text { font-size: 12px; color: var(--muted); flex: 1; }
-  .status-text strong { color: var(--text); }
+.vf-box{
+  position:absolute;
+  top:20%;left:5%;right:5%;bottom:20%;
+  border:1.5px solid rgba(91,110,245,.5);
+}
+/* Corner accents */
+.vf-box::before,.vf-box::after,
+.vf-tl,.vf-tr,.vf-bl,.vf-br{
+  position:absolute;width:22px;height:22px;
+  border-color:var(--accent);border-style:solid;
+}
+.vf-tl{top:-1px;left:-1px;border-width:2.5px 0 0 2.5px}
+.vf-tr{top:-1px;right:-1px;border-width:2.5px 2.5px 0 0}
+.vf-bl{bottom:-1px;left:-1px;border-width:0 0 2.5px 2.5px}
+.vf-br{bottom:-1px;right:-1px;border-width:0 2.5px 2.5px 0}
 
-  /* RESULT PREVIEW */
-  .result-preview {
-    display: none;
-    margin: 12px 16px;
-    padding: 12px 14px;
-    background: rgba(0,229,255,0.06);
-    border: 1px solid var(--accent);
-    border-radius: 6px;
-  }
-  .result-preview.show { display: block; }
-  .result-row { display: flex; gap: 8px; margin-bottom: 4px; font-size: 12px; }
-  .result-label { color: var(--muted); min-width: 90px; }
-  .result-value { color: var(--accent); font-weight: 700; letter-spacing: 1px; }
-  .result-actions { display: flex; gap: 8px; margin-top: 10px; }
-  .btn-confirm {
-    flex: 1; padding: 10px;
-    background: var(--green); color: #000;
-    border: none; border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer; letter-spacing: 1px;
-  }
-  .btn-retry {
-    flex: 1; padding: 10px;
-    background: transparent; color: var(--danger);
-    border: 1px solid var(--danger); border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer; letter-spacing: 1px;
-  }
+/* Scan beam */
+.beam{
+  position:absolute;left:5%;right:5%;
+  height:2px;
+  background:linear-gradient(90deg,transparent 0%,var(--accent) 30%,#fff 50%,var(--accent) 70%,transparent 100%);
+  box-shadow:0 0 12px 2px var(--accent-glow);
+  animation:beam 2.8s cubic-bezier(.4,0,.6,1) infinite;
+  top:20%;
+  display:none;
+}
+.beam.active{display:block}
+@keyframes beam{
+  0%{top:20%;opacity:0}
+  5%{opacity:1}
+  95%{opacity:1}
+  100%{top:80%;opacity:0}
+}
 
-  /* PANELS LIST */
-  .panels-section {
-    padding: 12px 16px;
-  }
-  .panels-title {
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-  .panel-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    margin-bottom: 6px;
-    transition: border-color 0.2s;
-  }
-  .panel-item.new-item {
-    border-color: var(--green);
-    animation: flashIn 0.5s ease;
-  }
-  @keyframes flashIn {
-    0%   { background: rgba(0,255,136,0.2); }
-    100% { background: var(--surface); }
-  }
-  .panel-name { font-size: 13px; font-weight: 700; color: var(--accent); }
-  .panel-siparis { font-size: 10px; color: var(--muted); margin-top: 2px; }
-  .panel-count {
-    background: var(--border);
-    color: var(--text);
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 9px;
-    border-radius: 12px;
-  }
+/* OCR state indicator inside viewfinder */
+.vf-state{
+  position:absolute;bottom:21%;left:50%;transform:translateX(-50%);
+  font-size:10px;letter-spacing:2px;color:var(--accent);
+  background:rgba(6,6,8,.75);
+  padding:4px 14px;border-radius:20px;
+  border:1px solid var(--accent);
+  white-space:nowrap;
+}
 
-  /* BOTTOM ACTIONS */
-  .bottom-bar {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    padding: 12px 16px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 10px;
-  }
-  .btn-zip {
-    flex: 1; padding: 14px;
-    background: var(--accent2); color: #fff;
-    border: none; border-radius: 6px;
-    font-family: 'Courier New', monospace;
-    font-size: 14px; font-weight: 700;
-    cursor: pointer; letter-spacing: 2px;
-    text-transform: uppercase;
-  }
-  .btn-zip:disabled { opacity: 0.3; cursor: not-allowed; }
-  .btn-clear {
-    padding: 14px 18px;
-    background: transparent; color: var(--danger);
-    border: 1px solid var(--danger); border-radius: 6px;
-    font-family: 'Courier New', monospace;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer;
-  }
+/* ── STATUS ── */
+.status{
+  flex-shrink:0;
+  padding:10px 18px;
+  background:var(--s1);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;min-height:44px;
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.dot.scanning{background:var(--accent);animation:blink 1.2s infinite}
+.dot.ok{background:var(--green)}
+.dot.err{background:var(--red)}
+.dot.warn{background:var(--amber)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.status-msg{font-size:11px;color:var(--muted);flex:1;line-height:1.4}
+.status-msg b{color:var(--text)}
 
-  .empty-state {
-    text-align: center;
-    padding: 30px 20px;
-    color: var(--muted);
-    font-size: 12px;
-    letter-spacing: 1px;
-  }
-  .empty-state .icon { font-size: 32px; margin-bottom: 10px; }
+/* ── RESULT CARD ── */
+.result-card{
+  flex-shrink:0;
+  margin:10px 14px;
+  background:var(--card);
+  border:1px solid var(--accent);
+  border-radius:10px;
+  overflow:hidden;
+  display:none;
+  box-shadow:0 0 24px var(--accent-glow);
+  animation:slideUp .25s ease;
+}
+.result-card.show{display:block}
+@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-  .pb-bottom { padding-bottom: 80px; }
+.result-card-header{
+  background:linear-gradient(135deg,rgba(91,110,245,.15),rgba(34,211,165,.08));
+  padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.result-card-title{font-size:9px;letter-spacing:3px;color:var(--accent);font-weight:700}
+.panel-badge{
+  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
+  color:var(--green);letter-spacing:1px;
+}
 
-  /* Loading overlay */
-  #ocr-loading {
-    display: none;
-    position: absolute;
-    inset: 0;
-    background: rgba(10,10,15,0.85);
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 12px;
-    z-index: 10;
-  }
-  #ocr-loading.show { display: flex; }
-  .spinner {
-    width: 36px; height: 36px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-text { font-size: 12px; color: var(--accent); letter-spacing: 2px; }
+.result-fields{padding:10px 14px;display:grid;gap:6px}
+.rf{display:flex;gap:8px;align-items:baseline}
+.rf-label{font-size:9px;letter-spacing:2px;color:var(--muted);min-width:80px;flex-shrink:0}
+.rf-val{font-size:12px;color:var(--text);font-weight:700;word-break:break-all}
+
+.result-actions{display:flex;gap:0;border-top:1px solid var(--border)}
+.btn-save{
+  flex:1;padding:13px;
+  background:var(--green);color:#060608;
+  border:none;font-family:'Space Mono',monospace;
+  font-size:12px;font-weight:700;letter-spacing:2px;
+  cursor:pointer;transition:opacity .15s;
+}
+.btn-save:active{opacity:.8}
+.btn-skip{
+  flex:1;padding:13px;
+  background:transparent;color:var(--red);
+  border:none;border-left:1px solid var(--border);
+  font-family:'Space Mono',monospace;
+  font-size:12px;font-weight:700;letter-spacing:2px;
+  cursor:pointer;
+}
+
+/* ── SCROLL AREA ── */
+.scroll-area{flex:1;overflow-y:auto;padding:10px 14px 90px;-webkit-overflow-scrolling:touch}
+
+.section-label{
+  font-size:9px;letter-spacing:3px;color:var(--muted);
+  margin-bottom:8px;
+}
+
+/* Panel cards */
+.panel-grid{display:grid;gap:6px}
+.pc{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:8px;padding:11px 14px;
+  transition:border-color .2s;
+}
+.pc.new{border-color:var(--green);animation:flash .6s ease}
+@keyframes flash{0%{background:rgba(34,211,165,.15)}100%{background:var(--s2)}}
+.pc-left{}
+.pc-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--accent)}
+.pc-sub{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.5px}
+.pc-count{
+  font-size:11px;font-weight:700;
+  background:var(--border);color:var(--text);
+  padding:4px 10px;border-radius:12px;
+}
+
+.empty{text-align:center;padding:32px 20px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:.5}
+.empty-text{font-size:11px;letter-spacing:1px;line-height:1.7}
+
+/* ── BOTTOM BAR ── */
+.btm{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:10px 14px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  background:var(--s1);border-top:1px solid var(--border);
+  display:flex;gap:8px;z-index:20;
+}
+.btn-zip{
+  flex:1;padding:14px;
+  background:linear-gradient(135deg,var(--accent),#7c3aed);
+  color:#fff;border:none;border-radius:8px;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;
+  letter-spacing:1px;cursor:pointer;
+  box-shadow:0 4px 20px var(--accent-glow);
+  transition:opacity .15s,transform .1s;
+}
+.btn-zip:active{transform:scale(.97);opacity:.9}
+.btn-zip:disabled{opacity:.3;box-shadow:none;cursor:not-allowed}
+.btn-clr{
+  padding:14px 16px;
+  background:transparent;color:var(--muted);
+  border:1px solid var(--border);border-radius:8px;
+  font-family:'Space Mono',monospace;font-size:11px;
+  cursor:pointer;transition:color .2s,border-color .2s;
+}
+.btn-clr:active{color:var(--red);border-color:var(--red)}
+
+canvas{display:none}
 </style>
 </head>
 <body>
+<div class="app">
 
-<div class="header">
-  <h1>ETİKET TARAYICI</h1>
-  <div class="count-badge" id="totalBadge">0 ADET</div>
-</div>
-
-<div class="camera-section">
-  <video id="video" autoplay playsinline muted></video>
-  <div class="scan-overlay">
-    <div class="scan-frame"></div>
-    <div class="scan-line"></div>
-  </div>
-  <div id="ocr-loading">
-    <div class="spinner"></div>
-    <div class="loading-text">OKUNUYOR...</div>
-  </div>
-</div>
-
-<div class="status-bar">
-  <div class="status-dot" id="statusDot"></div>
-  <div class="status-text" id="statusText">Kamera başlatılıyor...</div>
-</div>
-
-<div class="result-preview" id="resultPreview">
-  <div class="result-row">
-    <span class="result-label">SİPARİŞ NO</span>
-    <span class="result-value" id="rSiparis">—</span>
-  </div>
-  <div class="result-row">
-    <span class="result-label">UPPER LIST</span>
-    <span class="result-value" id="rUpper">—</span>
-  </div>
-  <div class="result-row">
-    <span class="result-label">PART NO</span>
-    <span class="result-value" id="rPart">—</span>
-  </div>
-  <div class="result-row">
-    <span class="result-label">PANEL NO</span>
-    <span class="result-value" id="rPanel">—</span>
-  </div>
-  <div class="result-actions">
-    <button class="btn-confirm" onclick="confirmResult()">✓ KAYDET</button>
-    <button class="btn-retry"   onclick="retryResult()">↺ TEKRAR</button>
-  </div>
-</div>
-
-<div class="panels-section pb-bottom">
-  <div class="panels-title">Taranan Panolar</div>
-  <div id="panelsList">
-    <div class="empty-state">
-      <div class="icon">📦</div>
-      <div>Henüz taranmış etiket yok</div>
-      <div style="margin-top:6px">Etiketi çerçeve içine getirin</div>
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-logo">ETİKET TARAYICI</div>
+    <div class="hdr-right">
+      <div class="pill" id="scanPill">HAZIR DEĞİL</div>
+      <div class="pill" id="cntPill">0 ADET</div>
     </div>
   </div>
+
+  <!-- CAMERA -->
+  <div class="cam-wrap" id="camWrap">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="vf">
+      <div class="vf-dark-top"></div>
+      <div class="vf-dark-bot"></div>
+      <div class="vf-dark-left"></div>
+      <div class="vf-dark-right"></div>
+      <div class="vf-box">
+        <div class="vf-tl"></div><div class="vf-tr"></div>
+        <div class="vf-bl"></div><div class="vf-br"></div>
+      </div>
+      <div class="beam" id="beam"></div>
+      <div class="vf-state" id="vfState">Başlatılıyor...</div>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <div class="status-msg" id="statusMsg">Kamera başlatılıyor...</div>
+  </div>
+
+  <!-- RESULT CARD -->
+  <div class="result-card" id="resultCard">
+    <div class="result-card-header">
+      <div class="result-card-title">ETİKET OKUNDU</div>
+      <div class="panel-badge" id="rPanelBig">—</div>
+    </div>
+    <div class="result-fields">
+      <div class="rf"><div class="rf-label">SİPARİŞ</div><div class="rf-val" id="rSiparis">—</div></div>
+      <div class="rf"><div class="rf-label">UPPER LIST</div><div class="rf-val" id="rUpper">—</div></div>
+      <div class="rf"><div class="rf-label">PART NO</div><div class="rf-val" id="rPart">—</div></div>
+      <div class="rf"><div class="rf-label">PANEL NO</div><div class="rf-val" id="rPanel">—</div></div>
+    </div>
+    <div class="result-actions">
+      <button class="btn-save" onclick="confirmResult()">✓ KAYDET</button>
+      <button class="btn-skip" onclick="retryResult()">✕ TEKRAR</button>
+    </div>
+  </div>
+
+  <!-- SCROLL -->
+  <div class="scroll-area">
+    <div class="section-label">TARANAN PANOLAR</div>
+    <div class="panel-grid" id="panelGrid">
+      <div class="empty">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">Etiketi çerçeve içine getirin<br>Otomatik okuma başlar</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM -->
+  <div class="btm">
+    <button class="btn-zip" id="zipBtn" onclick="downloadZip()" disabled>ZIP İNDİR</button>
+    <button class="btn-clr" onclick="clearAll()">SİL</button>
+  </div>
 </div>
 
-<div class="bottom-bar">
-  <button class="btn-zip" id="zipBtn" onclick="downloadZip()" disabled>ZIP İNDİR</button>
-  <button class="btn-clear" onclick="clearAll()">SİL</button>
-</div>
-
-<canvas id="canvas" style="display:none"></canvas>
+<canvas id="canvas"></canvas>
 
 <script>
-// ── STATE ────────────────────────────────────────────────────────────────────
-const state = {
-  panels: {},        // { "Pano_01_7024055700": [ {name, blob} ] }
-  totalCount: 0,
-  scanning: true,
-  lastResult: null,
-  capturedBlob: null,
-  worker: null,
-  scanInterval: null,
-  cooldown: false,
+/* ── STATE ── */
+const S = {
+  panels:{}, total:0,
+  scanning:false, busy:false, cooldown:false,
+  worker:null, timer:null,
+  lastResult:null, capturedBlob:null,
 };
 
-// ── OCR WORKER ───────────────────────────────────────────────────────────────
-async function initOCR() {
-  setStatus('scanning', 'OCR motoru yükleniyor...');
-  state.worker = await Tesseract.createWorker('eng', 1, {
-    logger: () => {}
-  });
-  await state.worker.setParameters({
-    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/ .-_',
-  });
-  setStatus('scanning', 'Etiketi çerçeve içine getirin');
-  startAutoScan();
+/* ── CAMERA SIZE ── */
+function sizeCam(){
+  const wrap = document.getElementById('camWrap');
+  const vh = window.innerHeight;
+  // camera takes ~45% of screen
+  wrap.style.height = Math.round(vh * 0.44) + 'px';
+}
+window.addEventListener('resize', sizeCam);
+sizeCam();
+
+/* ── INIT ── */
+async function init(){
+  await startCamera();
+  await initOCR();
 }
 
-// ── CAMERA ───────────────────────────────────────────────────────────────────
-async function startCamera() {
-  try {
+async function startCamera(){
+  try{
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      }
+      video:{facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}}
     });
-    document.getElementById('video').srcObject = stream;
-    await initOCR();
-  } catch(e) {
-    setStatus('error', 'Kamera erişimi reddedildi: ' + e.message);
+    const vid = document.getElementById('video');
+    vid.srcObject = stream;
+    await new Promise(r => vid.onloadedmetadata = r);
+    setStatus('scanning','Kamera hazır — OCR yükleniyor...');
+  }catch(e){
+    setStatus('err','Kamera hatası: '+e.message);
+    vfState('HATA');
   }
 }
 
-// ── AUTO SCAN ────────────────────────────────────────────────────────────────
-function startAutoScan() {
-  state.scanInterval = setInterval(async () => {
-    if (!state.scanning || state.cooldown) return;
-    const result = await captureAndOCR();
-    if (result && result.siparis && result.panel) {
-      state.cooldown = true;
-      showResult(result);
-    }
-  }, 2500);
+async function initOCR(){
+  vfState('OCR YÜKLENİYOR');
+  S.worker = await Tesseract.createWorker('eng',1,{logger:()=>{}});
+  await S.worker.setParameters({
+    tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/.\\- ',
+    tessedit_pageseg_mode:'6',  // uniform block of text
+  });
+  S.scanning = true;
+  setPill('scanPill','TARAMA AKTİF','active');
+  setStatus('scanning','Etiketi çerçeve içine getirin');
+  vfState('TARAMA AKTİF');
+  document.getElementById('beam').classList.add('active');
+  scheduleNext();
 }
 
-async function captureAndOCR() {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  if (video.readyState < 2) return null;
+/* ── SCAN LOOP ── */
+function scheduleNext(){
+  clearTimeout(S.timer);
+  S.timer = setTimeout(doScan, 3000);
+}
 
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw || !vh) return null;
+async function doScan(){
+  if(!S.scanning || S.busy || S.cooldown) return scheduleNext();
+  S.busy = true;
+  vfState('OKUNUYOR...');
 
-  // Çerçeveye karşılık gelen video alanını kırp (%82 genişlik, %42 yükseklik, ortalı)
-  const cropW = Math.floor(vw * 0.82);
-  const cropH = Math.floor(vh * 0.42);
-  const cropX = Math.floor((vw - cropW) / 2);
-  const cropY = Math.floor((vh - cropH) / 2);
+  const result = await captureAndOCR();
+  S.busy = false;
 
-  canvas.width  = cropW;
-  canvas.height = cropH;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+  if(result && result.siparis && result.panel){
+    S.cooldown = true;
+    S.scanning = false;
+    document.getElementById('beam').classList.remove('active');
+    showResult(result);
+  } else {
+    vfState('TARAMA AKTİF');
+    scheduleNext();
+  }
+}
 
-  // Kontrast artır
-  ctx.filter = 'contrast(1.4) brightness(1.1)';
-  ctx.drawImage(canvas, 0, 0);
-  ctx.filter = 'none';
+/* ── CAPTURE + OCR ── */
+async function captureAndOCR(){
+  const vid = document.getElementById('video');
+  const cvs = document.getElementById('canvas');
+  if(vid.readyState < 2 || !vid.videoWidth) return null;
 
-  document.getElementById('ocr-loading').classList.add('show');
+  const vw = vid.videoWidth, vh = vid.videoHeight;
 
-  try {
-    const { data: { text } } = await state.worker.recognize(canvas);
-    document.getElementById('ocr-loading').classList.remove('show');
+  // Crop: middle 90% width, 60% height (etiket bölgesi)
+  const cw = Math.floor(vw * 0.90);
+  const ch = Math.floor(vh * 0.60);
+  const cx = Math.floor((vw - cw) / 2);
+  const cy = Math.floor((vh - ch) / 2);
+
+  // Upscale for better OCR
+  const scale = 2;
+  cvs.width  = cw * scale;
+  cvs.height = ch * scale;
+  const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.scale(scale, scale);
+  ctx.drawImage(vid, cx, cy, cw, ch, 0, 0, cw, ch);
+  ctx.setTransform(1,0,0,1,0,0);
+
+  // Enhance contrast
+  const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
+  enhance(imgData);
+  ctx.putImageData(imgData, 0, 0);
+
+  try{
+    const {data:{text}} = await S.worker.recognize(cvs);
+    console.log('OCR:', text);
     return parseLabel(text);
-  } catch(e) {
-    document.getElementById('ocr-loading').classList.remove('show');
+  }catch(e){
+    console.error(e);
     return null;
   }
 }
 
-// ── PARSE ────────────────────────────────────────────────────────────────────
-function parseLabel(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  let siparis = '', upper = '', part = '', panel = '';
+function enhance(imgData){
+  const d = imgData.data;
+  for(let i=0;i<d.length;i+=4){
+    // Grayscale
+    const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    // Increase contrast
+    const c = Math.min(255, Math.max(0, (g - 128) * 1.6 + 128 + 10));
+    d[i] = d[i+1] = d[i+2] = c;
+  }
+}
 
-  for (const line of lines) {
+/* ── PARSE ── */
+function parseLabel(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  let siparis='', upper='', part='', panel='';
+
+  for(const line of lines){
     const up = line.toUpperCase();
 
-    // Sipariş no: 7 haneli+ sayı (70240 ile başlar genellikle)
-    if (!siparis) {
-      const m = line.match(/\b(70\d{8,}|\d{10,})\b/);
-      if (m) { siparis = m[1]; continue; }
+    // Sipariş no: 10 haneli, 70 ile başlar
+    if(!siparis){
+      const m = line.match(/\b(70\d{8})\b/);
+      if(m){ siparis=m[1]; continue; }
     }
 
-    // UPPER LIST
-    if (up.includes('UPPER') || up.includes('UPPE')) {
-      const m = line.match(/[:\s]+([8][A-Z0-9\-]+)/);
-      if (m) upper = m[1];
+    // UPPER LIST: 8PQ ile başlayan
+    if(!upper && (up.includes('UPPER') || up.includes('UPPE'))){
+      const m = line.match(/([8][A-Z0-9]{2,}\d[A-Z0-9\-]+)/);
+      if(m) upper=m[1];
       continue;
     }
 
     // PART NO
-    if (up.includes('PART') && !up.includes('PANEL')) {
-      const m = line.match(/[:\s]+([8][A-Z0-9\-]+)/);
-      if (m) part = m[1];
+    if(!part && up.includes('PART') && !up.includes('PANEL')){
+      const m = line.match(/([8][A-Z0-9]{2,}\d[A-Z0-9\-]+)/);
+      if(m) part=m[1];
       continue;
     }
 
-    // PANEL NO
-    if (up.includes('PANEL')) {
-      const m = line.match(/PANEL\s*NO\s*[:\s]*(\w+)/i);
-      if (m) panel = m[1].replace(/^0+/, '') || '0'; // leading zeros kaldır
-      // Accessories Kit
-      if (!panel && up.includes('ACCESSORIES')) panel = 'Accessories Kit';
+    // PANEL NO — en kritik kısım
+    if(up.includes('PANEL')){
+      // "PANEL NO:1" veya "PANEL NO: A01" veya "PANEL NO:Accessories Kit"
+      let m = line.match(/PANEL\s*NO\s*[:\s]+([A-Za-z0-9]+(?:\s+Kit)?)/i);
+      if(m){
+        panel = m[1].trim();
+        if(up.includes('ACCESSORIES') || up.includes('KIT')) panel='Accessories Kit';
+      }
       continue;
     }
   }
 
-  // Panel bulunamadıysa tek başına sayı satırı ara
-  if (!panel) {
-    for (const line of lines) {
-      if (/^\d{1,3}$/.test(line)) { panel = line; break; }
+  // Panel bulunamadı — satırlarda izole 1-3 haneli sayı ara
+  if(!panel){
+    for(const line of lines){
+      if(/^\d{1,3}$/.test(line.trim())){ panel=line.trim(); break; }
     }
   }
 
-  if (!siparis || !panel) return null;
-  return { siparis, upper, part, panel, raw: text };
+  if(!siparis || !panel) return null;
+  return {siparis, upper, part, panel};
 }
 
-// ── SHOW RESULT ───────────────────────────────────────────────────────────────
-async function showResult(result) {
-  state.scanning = false;
-  state.lastResult = result;
+/* ── SHOW RESULT ── */
+async function showResult(result){
+  S.lastResult = result;
 
-  // Fotoğrafı kaydet
-  const canvas = document.getElementById('canvas');
-  state.capturedBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.88));
+  // Capture jpeg
+  const cvs = document.getElementById('canvas');
+  S.capturedBlob = await new Promise(r=>cvs.toBlob(r,'image/jpeg',0.90));
 
-  document.getElementById('rSiparis').textContent = result.siparis;
-  document.getElementById('rUpper').textContent   = result.upper || '—';
-  document.getElementById('rPart').textContent    = result.part  || '—';
-  document.getElementById('rPanel').textContent   = 'Pano ' + result.panel;
+  document.getElementById('rPanelBig').textContent = 'PANO '+result.panel;
+  document.getElementById('rSiparis').textContent  = result.siparis;
+  document.getElementById('rUpper').textContent    = result.upper || '—';
+  document.getElementById('rPart').textContent     = result.part  || '—';
+  document.getElementById('rPanel').textContent    = result.panel;
 
-  document.getElementById('resultPreview').classList.add('show');
-  setStatus('ok', `<strong>Pano ${result.panel}</strong> okundu — kaydet veya tekrar çek`);
+  document.getElementById('resultCard').classList.add('show');
+  setPill('scanPill','ONAY BEKLİYOR','ok');
+  setStatus('ok','<b>Pano '+result.panel+'</b> okundu — kaydedin veya tekrar tarayın');
+  vfState('✓ OKUNDU');
 }
 
-function confirmResult() {
-  const r = state.lastResult;
-  if (!r) return;
-
-  const key = `${r.siparis}_Pano_${r.panel.toString().padStart(2,'0')}`;
-  if (!state.panels[key]) state.panels[key] = [];
-
-  const idx = state.panels[key].length + 1;
-  const filename = `${key}_${String(idx).padStart(3,'0')}.jpg`;
-  state.panels[key].push({ name: filename, blob: state.capturedBlob });
-
-  state.totalCount++;
-  document.getElementById('totalBadge').textContent = state.totalCount + ' ADET';
+function confirmResult(){
+  const r = S.lastResult;
+  if(!r) return;
+  const key = r.siparis+'_Pano_'+String(r.panel).padStart(2,'0');
+  if(!S.panels[key]) S.panels[key]=[];
+  const idx = S.panels[key].length+1;
+  S.panels[key].push({name:`${key}_${String(idx).padStart(3,'0')}.jpg`, blob:S.capturedBlob});
+  S.total++;
+  document.getElementById('cntPill').textContent = S.total+' ADET';
   document.getElementById('zipBtn').disabled = false;
-
   renderPanels(key);
   retryResult();
 }
 
-function retryResult() {
-  document.getElementById('resultPreview').classList.remove('show');
-  state.lastResult = null;
-  state.capturedBlob = null;
-  state.scanning = true;
-  state.cooldown = false;
-  setStatus('scanning', 'Etiketi çerçeve içine getirin');
+function retryResult(){
+  document.getElementById('resultCard').classList.remove('show');
+  S.lastResult=null; S.capturedBlob=null;
+  S.scanning=true; S.cooldown=false;
+  document.getElementById('beam').classList.add('active');
+  setPill('scanPill','TARAMA AKTİF','active');
+  setStatus('scanning','Etiketi çerçeve içine getirin');
+  vfState('TARAMA AKTİF');
+  scheduleNext();
 }
 
-// ── RENDER ───────────────────────────────────────────────────────────────────
-function renderPanels(newKey) {
-  const list = document.getElementById('panelsList');
-  const keys = Object.keys(state.panels).sort();
-  if (!keys.length) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">📦</div><div>Henüz taranmış etiket yok</div></div>`;
+/* ── RENDER ── */
+function renderPanels(newKey){
+  const grid = document.getElementById('panelGrid');
+  const keys = Object.keys(S.panels).sort();
+  if(!keys.length){
+    grid.innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Etiketi çerçeve içine getirin<br>Otomatik okuma başlar</div></div>`;
     return;
   }
-
-  list.innerHTML = keys.map(k => {
-    const parts = k.split('_');
-    const siparis = parts[0];
-    const pano = parts.slice(1).join(' ');
-    const count = state.panels[k].length;
-    const isNew = k === newKey;
-    return `<div class="panel-item ${isNew ? 'new-item' : ''}">
-      <div>
-        <div class="panel-name">${pano.replace(/_/g,' ')}</div>
-        <div class="panel-siparis">${siparis}</div>
+  grid.innerHTML = keys.map(k=>{
+    const parts = k.split('_Pano_');
+    const sip = parts[0], pano = 'PANO '+(parts[1]||'');
+    const cnt = S.panels[k].length;
+    return `<div class="pc ${k===newKey?'new':''}">
+      <div class="pc-left">
+        <div class="pc-name">${pano}</div>
+        <div class="pc-sub">${sip}</div>
       </div>
-      <div class="panel-count">${count} foto</div>
+      <div class="pc-count">${cnt} foto</div>
     </div>`;
   }).join('');
 }
 
-// ── ZIP ───────────────────────────────────────────────────────────────────────
-async function downloadZip() {
-  const btn = document.getElementById('zipBtn');
-  btn.textContent = 'HAZIRLANIYOR...';
-  btn.disabled = true;
-
-  const zip = new JSZip();
-  for (const [key, files] of Object.entries(state.panels)) {
-    const folder = zip.folder(key);
-    for (const f of files) {
-      folder.file(f.name, f.blob);
-    }
+/* ── ZIP ── */
+async function downloadZip(){
+  const btn=document.getElementById('zipBtn');
+  btn.textContent='HAZIRLANIYOR...'; btn.disabled=true;
+  const zip=new JSZip();
+  for(const [key,files] of Object.entries(S.panels)){
+    const folder=zip.folder(key);
+    for(const f of files) folder.file(f.name,f.blob);
   }
-
-  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = `Etiketler_${Date.now()}.zip`;
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Etiketler_${new Date().toISOString().slice(0,10)}.zip`;
   a.click();
-  URL.revokeObjectURL(url);
-
-  btn.textContent = 'ZIP İNDİR';
-  btn.disabled = false;
+  btn.textContent='ZIP İNDİR'; btn.disabled=false;
 }
 
-// ── CLEAR ─────────────────────────────────────────────────────────────────────
-function clearAll() {
-  if (!confirm('Tüm taranan etiketler silinecek. Emin misiniz?')) return;
-  state.panels = {};
-  state.totalCount = 0;
-  document.getElementById('totalBadge').textContent = '0 ADET';
-  document.getElementById('zipBtn').disabled = true;
+/* ── CLEAR ── */
+function clearAll(){
+  if(!Object.keys(S.panels).length) return;
+  if(!confirm('Tüm taranan etiketler silinecek?')) return;
+  S.panels={}; S.total=0;
+  document.getElementById('cntPill').textContent='0 ADET';
+  document.getElementById('zipBtn').disabled=true;
   renderPanels(null);
-  retryResult();
 }
 
-// ── STATUS ────────────────────────────────────────────────────────────────────
-function setStatus(type, msg) {
-  const dot  = document.getElementById('statusDot');
-  const text = document.getElementById('statusText');
-  dot.className  = 'status-dot ' + type;
-  text.innerHTML = msg;
+/* ── HELPERS ── */
+function setStatus(type,msg){
+  const dot=document.getElementById('dot');
+  dot.className='dot '+type;
+  document.getElementById('statusMsg').innerHTML=msg;
 }
+function setPill(id,txt,cls){
+  const p=document.getElementById(id);
+  p.textContent=txt; p.className='pill'+(cls?' '+cls:'');
+}
+function vfState(txt){ document.getElementById('vfState').textContent=txt; }
 
-// ── INIT ─────────────────────────────────────────────────────────────────────
-startCamera();
+/* ── START ── */
+init();
 </script>
 </body>
 </html>
