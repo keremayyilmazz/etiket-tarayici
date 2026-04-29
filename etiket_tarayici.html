@@ -163,8 +163,8 @@
                 
                 // --- İŞTE KORUMALI URL YÖNTEMİ ---
                 // Tarayıcının kodu bozmasını kesin olarak engellemek için url'yi parçalara ayırıp birleştiriyoruz.
-                const modelStr = "gemini-1.5-flash";
-                const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelStr + ":generateContent?key=" + apiKey;
+                const modelStr = "gemini-2.0-flash";
+const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelStr + ":generateContent?key=" + apiKey;
 
                 const requestBody = JSON.stringify({
                     contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }]
