@@ -77,144 +77,138 @@
 
     <script>
         // Teşhis loglarını ekrana yazdırma fonksiyonu
-        const logDiv = document.getElementById('debug-log');
-        function sysLog(msg) {
-            logDiv.innerHTML += `> ${msg}<br>`;
-            logDiv.scrollTop = logDiv.scrollHeight;
-        }
+const logDiv = document.getElementById('debug-log');
+function sysLog(msg) {
+    logDiv.innerHTML += `> ${msg}<br>`;
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
 
-        function checkApiKey() {
-            sysLog("API Key kontrol ediliyor...");
-            const apiKey = localStorage.getItem('gemini_api_key');
-            if (!apiKey) {
-                sysLog("API Key bulunamadı, modal açılıyor.");
-                document.getElementById('api-modal').classList.remove('hidden');
-            } else {
-                sysLog("API Key mevcut, kamera başlatılıyor.");
-                startCamera();
-            }
-        }
+function checkApiKey() {
+    sysLog("API Key kontrol ediliyor...");
+    const apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+        document.getElementById('api-modal').classList.remove('hidden');
+    } else {
+        startCamera();
+    }
+}
 
-        function saveApiKey() {
-            const input = document.getElementById('api-key-input').value.trim();
-            if (input) {
-                localStorage.setItem('gemini_api_key', input);
-                document.getElementById('api-modal').classList.add('hidden');
-                sysLog("API Key kaydedildi.");
-                startCamera();
-            }
-        }
+function saveApiKey() {
+    const input = document.getElementById('api-key-input').value.trim();
+    if (input) {
+        localStorage.setItem('gemini_api_key', input);
+        document.getElementById('api-modal').classList.add('hidden');
+        sysLog("API Key kaydedildi.");
+        startCamera();
+    }
+}
 
-        async function startCamera() {
-            sysLog("Kamera izinleri isteniyor...");
-            const videoElement = document.getElementById('camera-feed');
+async function startCamera() {
+    sysLog("Kamera başlatılıyor...");
+    const videoElement = document.getElementById('camera-feed');
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: { ideal: "environment" } } 
+        });
+        videoElement.srcObject = stream;
+        
+        videoElement.onloadedmetadata = () => {
+            sysLog(`Kamera Aktif: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
+            videoElement.play();
+        };
+    } catch (err) {
+        sysLog("HATA: Kamera başlatılamadı!");
+    }
+}
+
+let totalScanned = 0;
+
+async function captureImage() {
+    sysLog("Taramaya başlandı...");
+    const video = document.getElementById('camera-feed');
+    const btn = document.getElementById('capture-btn');
+    const apiKey = localStorage.getItem('gemini_api_key');
+
+    if (!apiKey) return alert("API Key bulunamadı!");
+    if (video.videoWidth === 0) return alert("Kamera henüz yüklenmedi.");
+
+    btn.style.backgroundColor = "orange";
+    btn.disabled = true;
+
+    try {
+        const canvas = document.createElement('canvas');
+        // Görüntüyü biraz büyüterek çizelim (okunabilirliği artırır)
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+        sysLog("Fotoğraf API'ye gönderiliyor...");
+
+        const promptText = `Bu bir Siemens aksesuar etiketi. Şu bilgileri JSON olarak ver:
+- siparis_no: En üstteki 10 haneli sayı (70 ile başlar)
+- upper_list: UPPER LIST satırındaki 8PQ... kodu
+- part_no: PART NO satırındaki 8PQ... kodu
+- panel_no: PANEL NO satırındaki değer (sayı veya Accessories Kit)
+Sadece JSON döndür, markdown formatı (```json) kullanma, başka hiçbir açıklama yazma.`;
+
+        const response = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }],
+                generationConfig: { response_mime_type: "application/json" }
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.candidates && data.candidates[0].content) {
+            let rawText = data.candidates[0].content.parts[0].text;
+            sysLog("Cevap geldi, işleniyor...");
             
-            // Tarayıcı desteği kontrolü
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                sysLog("HATA: Tarayıcı kamerayı desteklemiyor (HTTPS değil veya eski sürüm).");
-                return;
-            }
-
-            try {
-                // Daha esnek kamera kısıtlaması (ideal kullanımı)
-                const constraints = { video: { facingMode: { ideal: "environment" } } };
-                sysLog("Hedef: Arka kamera (ideal: environment)");
-                
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                sysLog("Kamera izni alındı, stream bağlandı.");
-                
-                videoElement.srcObject = stream;
-                
-                // Video oynamaya başladığında log at
-                videoElement.onloadedmetadata = () => {
-                    sysLog(`Video metadata yüklendi. Boyut: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
-                    videoElement.play().then(() => {
-                        sysLog("Video oynatılıyor (play successful).");
-                    }).catch(e => {
-                        sysLog("HATA: Video oynatma reddedildi: " + e.message);
-                    });
-                };
-
-            } catch (err) {
-                sysLog("HATA: Kamera başlatılamadı!");
-                sysLog("Detay: " + err.name + " - " + err.message);
-            }
-        }
-
-        // Önceki captureImage ve addToList fonksiyonları aynı kalıyor, log ekliyoruz
-        let totalScanned = 0;
-
-        async function captureImage() {
-            sysLog("Fotoğraf çekme tetiklendi.");
-            const video = document.getElementById('camera-feed');
-            const btn = document.getElementById('capture-btn');
-            const apiKey = localStorage.getItem('gemini_api_key');
-
-            if (!apiKey) return alert("API Key bulunamadı!");
+            // Eğer Gemini inat edip ```json yazarsa onu temizleyelim
+            let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
             
-            if (video.videoWidth === 0) {
-                sysLog("HATA: Video genişliği 0. Görüntü yok.");
-                return alert("Kamera görüntüsü henüz yüklenmedi.");
-            }
-
-            btn.style.backgroundColor = "orange";
-            btn.disabled = true;
-
             try {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                let result = JSON.parse(cleanText);
+                let panoNo = result.panel_no || "Accessories Kit";
+                if (panoNo.toString().trim() === "") panoNo = "Accessories Kit";
                 
-                const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-                sysLog("Fotoğraf çekildi ve Base64'e çevrildi. Gemini'ye gönderiliyor...");
-
-                const promptText = `Bu bir Siemens aksesuar etiketi. Şu bilgileri JSON olarak ver:\n- siparis_no: En üstteki 10 haneli sayı (70 ile başlar)\n- upper_list: UPPER LIST satırındaki 8PQ... kodu\n- part_no: PART NO satırındaki 8PQ... kodu\n- panel_no: PANEL NO satırındaki değer (sayı veya Accessories Kit)\nSadece JSON döndür, başka hiçbir şey yazma.`;
-
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }],
-                        generationConfig: { response_mime_type: "application/json" }
-                    })
-                });
-
-                const data = await response.json();
-                sysLog("Gemini'den yanıt geldi.");
-                
-                if (data.candidates && data.candidates[0].content) {
-                    let result = JSON.parse(data.candidates[0].content.parts[0].text);
-                    let panoNo = result.panel_no || "Accessories Kit";
-                    if (panoNo.toString().trim() === "") panoNo = "Accessories Kit";
-                    sysLog(`Başarılı: Pano ${panoNo} okundu.`);
-                    addToList(result.siparis_no, panoNo, result.part_no);
-                } else {
-                    sysLog("HATA: Etiket okunamadı (Yapay Zeka boş döndü).");
-                }
-            } catch (error) {
-                sysLog("HATA (API/Ağ): " + error.message);
-            } finally {
-                btn.style.backgroundColor = "var(--primary-color)";
-                btn.disabled = false;
+                sysLog(`BAŞARILI! Pano: ${panoNo}`);
+                addToList(result.siparis_no, panoNo, result.part_no);
+            } catch (parseErr) {
+                sysLog("HATA: JSON okunamadı. Gelen cevap: " + cleanText.substring(0, 50));
             }
+        } else {
+            // Eğer tamamen boş döndüyse Google'ın bize ne hata verdiğini ekrana yazdıralım
+            sysLog("HATA Detayı: " + JSON.stringify(data).substring(0, 150));
         }
+    } catch (error) {
+        sysLog("AĞ HATASI: " + error.message);
+    } finally {
+        btn.style.backgroundColor = "var(--primary-color)";
+        btn.disabled = false;
+    }
+}
 
-        function addToList(siparis, pano, parca) {
-            const listContainer = document.getElementById('scanned-list');
-            if (totalScanned === 0) listContainer.innerHTML = "";
-            totalScanned++;
-            document.getElementById('total-count').innerText = totalScanned;
+function addToList(siparis, pano, parca) {
+    const listContainer = document.getElementById('scanned-list');
+    if (totalScanned === 0) listContainer.innerHTML = "";
+    totalScanned++;
+    document.getElementById('total-count').innerText = totalScanned;
 
-            const item = document.createElement('div');
-            item.style.backgroundColor = "#2a2a2a";
-            item.style.padding = "10px"; item.style.marginBottom = "10px"; item.style.borderRadius = "6px";
-            item.style.borderLeft = "4px solid var(--primary-color)";
-            item.innerHTML = `<div style="font-weight: bold; color: white; margin-bottom: 4px;">Pano: ${pano}</div><div style="font-size: 12px; color: var(--text-muted);">Sipariş: ${siparis} | Parça: ${parca}</div>`;
-            listContainer.prepend(item);
-        }
+    const item = document.createElement('div');
+    item.style.backgroundColor = "#2a2a2a";
+    item.style.padding = "10px"; item.style.marginBottom = "10px"; item.style.borderRadius = "6px";
+    item.style.borderLeft = "4px solid var(--primary-color)";
+    item.innerHTML = `<div style="font-weight: bold; color: white; margin-bottom: 4px;">Pano: ${pano}</div><div style="font-size: 12px; color: var(--text-muted);">Sipariş: ${siparis} | Parça: ${parca}</div>`;
+    listContainer.prepend(item);
+}
 
-        window.onload = checkApiKey;
+window.onload = checkApiKey;
     </script>
 </body>
 </html>
