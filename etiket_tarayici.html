@@ -6,7 +6,7 @@
 <meta name="google" content="notranslate">
 <title>Etiket Tarayıcı</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -264,28 +264,25 @@ async function initOCR(){
 
 /* ── IMAGE PROCESSING ── */
 function processImage(srcCanvas, dstCanvas){
-  const sw = srcCanvas.width, sh = srcCanvas.height;
-  // 3x büyüt
-  const SCALE = 3;
-  dstCanvas.width  = sw * SCALE;
-  dstCanvas.height = sh * SCALE;
+  // 2x büyüt — threshold YOK, sadece kontrast artır
+  const SCALE = 2;
+  dstCanvas.width  = srcCanvas.width  * SCALE;
+  dstCanvas.height = srcCanvas.height * SCALE;
   const ctx = dstCanvas.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  // Büyüt
   ctx.scale(SCALE, SCALE);
   ctx.drawImage(srcCanvas, 0, 0);
   ctx.setTransform(1,0,0,1,0,0);
-  // Adaptive threshold — beyaz arka plan, siyah yazı
+  // Sadece kontrast artır, threshold uygulama
   const img = ctx.getImageData(0, 0, dstCanvas.width, dstCanvas.height);
   const d = img.data;
   for(let i=0; i<d.length; i+=4){
     const r=d[i], g=d[i+1], b=d[i+2];
-    // Grayscale
     const gray = 0.299*r + 0.587*g + 0.114*b;
-    // Contrast stretch + threshold
-    const val = gray > 140 ? 255 : 0;
-    d[i]=d[i+1]=d[i+2]=val;
+    // Kontrast artır ama threshold yapma
+    const c = Math.min(255, Math.max(0, (gray - 128) * 1.8 + 128));
+    d[i]=d[i+1]=d[i+2]=c;
   }
   ctx.putImageData(img, 0, 0);
 }
