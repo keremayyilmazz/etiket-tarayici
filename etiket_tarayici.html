@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Panel Aksesuar Tarayıcı - V6</title>
+    <title>Panel Aksesuar Tarayıcı - V7</title>
     <style>
         :root {
             --bg-color: #121212; --surface-color: #1e1e1e;
@@ -53,7 +53,7 @@
 </head>
 <body>
 
-    <div id="debug-log">V6 Başlatıldı. Sıkıştırma Aktif.<br></div>
+    <div id="debug-log">V7 Başlatıldı. Model Güncellendi.<br></div>
 
     <div id="api-modal" class="hidden">
         <div class="modal-content">
@@ -76,7 +76,7 @@
 
     <div id="list-container">
         <div class="header-row">
-            <h2>TARANAN PANOLAR</h2>
+            <h2>TARANAN ETİKETLER</h2>
             <div class="counter" id="total-count">0</div>
         </div>
         <div id="scanned-list" style="color: var(--text-muted); font-size: 14px; text-align: center; margin-top: 20px;">Henüz tarama yapılmadı.</div>
@@ -116,7 +116,7 @@
                 videoElement.srcObject = stream;
                 videoElement.onloadedmetadata = () => { 
                     videoElement.play(); 
-                    sysLog(`Kamera Aktif (${videoElement.videoWidth}x${videoElement.videoHeight})`);
+                    sysLog(`Kamera Aktif`);
                     btn.style.display = "none";
                     document.getElementById('capture-btn').classList.add('active');
                 };
@@ -134,18 +134,14 @@
             const previewImg = document.getElementById('preview-img');
             const apiKey = localStorage.getItem('gemini_api_key');
 
-            if (!apiKey) {
-                document.getElementById('api-modal').classList.remove('hidden');
-                return;
-            }
+            if (!apiKey) return;
 
             btn.style.backgroundColor = "orange";
             btn.classList.remove('active');
 
             try {
-                // --- İŞTE YENİ SIKIŞTIRMA MANTIĞI ---
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800; // Genişliği 800 piksele zorluyoruz
+                const MAX_WIDTH = 800;
                 const scaleSize = MAX_WIDTH / video.videoWidth;
                 
                 canvas.width = MAX_WIDTH;
@@ -154,20 +150,17 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Kaliteyi %70'e düşürüyoruz (Metin okumak için fazlasıyla yeterli)
                 const dataURL = canvas.toDataURL('image/jpeg', 0.7);
                 previewImg.src = dataURL; 
                 previewImg.style.display = "block";
                 
                 const imageData = dataURL.split(',')[1];
-                
-                // Veri boyutunu loga yazdıralım ki küçüldüğünü görelim
-                const kbSize = Math.round((imageData.length * 3 / 4) / 1024);
-                sysLog(`Veri: ${kbSize} KB. API'ye iletiliyor...`);
+                sysLog(`İstek atılıyor...`);
 
                 const promptText = "Görseldeki Siemens etiketini oku. Sadece JSON formatında şu alanları ver: siparis_no, upper_list, part_no, panel_no.";
 
-                const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
+                // MODEL İSMİ BURADA GÜNCELLENDİ (gemini-2.5-flash)
+                const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -175,10 +168,9 @@
                     })
                 });
 
-                // Google'dan HTTP düzeyinde hata gelirse (Örn: 400 Bad Request)
                 if (!response.ok) {
                     const errorText = await response.text();
-                    sysLog(`HTTP Hatası ${response.status}: ${errorText.substring(0,40)}`);
+                    sysLog(`API Hatası: ${errorText.substring(0,60)}`);
                     return;
                 }
 
@@ -191,8 +183,7 @@
                 
                 if (data.candidates && data.candidates[0].content) {
                     let rawText = data.candidates[0].content.parts[0].text;
-                    let cleanText = rawText.replace(/```json/gi, '').replace(/
-```/g, '').trim();
+                    let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
                     try {
                         let result = JSON.parse(cleanText);
                         let panoNo = result.panel_no || "Accessories Kit";
@@ -203,11 +194,10 @@
                         sysLog("JSON Hatası: " + cleanText.substring(0, 20));
                     }
                 } else {
-                    sysLog("Yanıt Boş. Veri: " + JSON.stringify(data).substring(0, 30));
+                    sysLog("Yanıt Boş.");
                 }
             } catch (error) {
-                // Fetch tamamen çökerse (Ağ veya Timeout) hatanın adını da gösterelim
-                sysLog("ÇÖKME: " + error.name + " - " + error.message);
+                sysLog("ÇÖKME: " + error.message);
             } finally {
                 setTimeout(() => { previewImg.style.display = "none"; }, 1500);
                 btn.style.backgroundColor = "";
