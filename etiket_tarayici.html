@@ -6,537 +6,388 @@
 <meta name="google" content="notranslate">
 <title>Etiket Tarayıcı</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0e0e0e;--surface:#1a1a1a;--surface2:#242424;
-  --accent:#00bfa5;--accent2:#ff6f00;--red:#f44336;
-  --text:#ffffff;--muted:#888;--border:#2e2e2e;
-}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;overflow:hidden}
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
-.hdr{flex-shrink:0;height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
-.hdr-title{font-size:14px;font-weight:700;letter-spacing:1px;color:var(--accent)}
-.hdr-right{display:flex;gap:8px;align-items:center}
-.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);transition:all .3s}
-.badge.on{background:rgba(0,191,165,.15);color:var(--accent);border-color:var(--accent)}
-.cam{flex-shrink:0;position:relative;background:#000;overflow:hidden}
+body{background:#111;color:#fff;font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+#hdr{height:48px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0}
+#hdr h1{font-size:14px;font-weight:700;color:#00bfa5;letter-spacing:1px}
+#cntBadge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#1f3f3f;color:#00bfa5;border:1px solid #00bfa5}
+#camBox{flex-shrink:0;position:relative;background:#000;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover;display:block}
-#previewImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:rgba(0,0,0,.9);display:none;z-index:5}
-.vf{position:absolute;inset:0;pointer-events:none;z-index:3}
-.vfm{position:absolute;background:rgba(0,0,0,.5)}
-.vfm.t{top:0;left:0;right:0;height:15%}
-.vfm.b{bottom:0;left:0;right:0;height:15%}
-.vfm.l{top:15%;bottom:15%;left:0;width:4%}
-.vfm.r{top:15%;bottom:15%;right:0;width:4%}
-.vf-frame{position:absolute;top:15%;left:4%;right:4%;bottom:15%;border:1px solid rgba(255,255,255,.2)}
-.corner{position:absolute;width:18px;height:18px;border-color:var(--accent);border-style:solid}
-.corner.tl{top:-1px;left:-1px;border-width:2.5px 0 0 2.5px}
-.corner.tr{top:-1px;right:-1px;border-width:2.5px 2.5px 0 0}
-.corner.bl{bottom:-1px;left:-1px;border-width:0 0 2.5px 2.5px}
-.corner.br{bottom:-1px;right:-1px;border-width:0 2.5px 2.5px 0}
-.scanline{position:absolute;left:4%;right:4%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 8px var(--accent);animation:scan 2.5s ease-in-out infinite;top:15%}
-@keyframes scan{0%{top:15%;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:85%;opacity:0}}
-.scanline.off{display:none}
-.vf-label{position:absolute;bottom:16%;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#fff;background:rgba(0,0,0,.65);padding:3px 14px;border-radius:3px;white-space:nowrap}
-.proc{position:absolute;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:10}
-.proc.show{display:flex}
-.spinner{width:42px;height:42px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.proc-txt{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,.7)}
-.proc-step{font-size:10px;color:var(--accent);letter-spacing:1px;margin-top:2px}
-.action-bar{flex-shrink:0;height:86px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:20px}
-.btn-capture{width:68px;height:68px;border-radius:50%;background:var(--surface2);border:3px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .1s,background .2s;pointer-events:none;opacity:.35}
-.btn-capture.ready{background:var(--accent);border-color:var(--accent);opacity:1;pointer-events:auto;box-shadow:0 0 22px rgba(0,191,165,.4)}
-.btn-capture:active{transform:scale(.92)}
-.btn-capture svg{pointer-events:none}
-.btn-side{padding:11px 16px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.5px}
-.btn-side.zip{border-color:var(--accent2);color:var(--accent2)}
-.btn-side:disabled{opacity:.3;cursor:not-allowed}
-.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);z-index:50;display:none;align-items:flex-end}
-.sheet-bg.show{display:flex;animation:fdin .2s}
-@keyframes fdin{from{opacity:0}to{opacity:1}}
-.sheet{width:100%;background:var(--surface);border-radius:16px 16px 0 0;padding:20px 18px 36px;animation:sup .25s ease}
-@keyframes sup{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
-.sheet-drag{width:32px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
-.sheet-ok{display:inline-flex;align-items:center;gap:6px;background:rgba(0,191,165,.1);border:1px solid var(--accent);border-radius:6px;padding:5px 12px;margin-bottom:14px}
-.sheet-ok-dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
-.sheet-ok-txt{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1px}
-.sheet-pano{font-size:30px;font-weight:700;letter-spacing:2px;margin-bottom:3px}
-.sheet-sip{font-size:11px;color:var(--muted);margin-bottom:14px;font-family:monospace}
+/* viewfinder */
+#vf{position:absolute;inset:0;pointer-events:none}
+.dm{position:absolute;background:rgba(0,0,0,.5)}
+.dm.t{top:0;left:0;right:0;height:18%}
+.dm.b{bottom:0;left:0;right:0;height:18%}
+.dm.l{top:18%;bottom:18%;left:0;width:5%}
+.dm.r{top:18%;bottom:18%;right:0;width:5%}
+#frame{position:absolute;top:18%;left:5%;right:5%;bottom:18%;border:2px solid #00bfa5;border-radius:4px}
+#scanLine{position:absolute;left:5%;right:5%;height:2px;background:linear-gradient(90deg,transparent,#00bfa5,transparent);animation:sc 2s ease-in-out infinite;top:18%}
+@keyframes sc{0%{top:18%}100%{top:82%}}
+#vfTxt{position:absolute;bottom:19%;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:1px;color:#fff;background:rgba(0,0,0,.7);padding:3px 14px;border-radius:3px;white-space:nowrap}
+/* proc */
+#proc{position:absolute;inset:0;background:rgba(0,0,0,.85);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10}
+#proc.on{display:flex}
+.ring{width:44px;height:44px;border:3px solid #222;border-top-color:#00bfa5;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#procTxt{font-size:12px;letter-spacing:2px;color:#aaa}
+/* action */
+#bar{flex-shrink:0;height:84px;background:#1a1a1a;border-top:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;gap:20px}
+#capBtn{width:66px;height:66px;border-radius:50%;background:#333;border:3px solid #444;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;opacity:.4;pointer-events:none}
+#capBtn.on{background:#00bfa5;border-color:#00bfa5;opacity:1;pointer-events:auto;box-shadow:0 0 20px rgba(0,191,165,.4)}
+#capBtn:active{transform:scale(.92)}
+#capBtn svg{pointer-events:none}
+.sbtn{padding:11px 15px;border:1.5px solid #333;border-radius:8px;background:transparent;color:#888;font-size:12px;font-weight:700;cursor:pointer}
+.sbtn.z{border-color:#ff6f00;color:#ff6f00}
+.sbtn:disabled{opacity:.3;cursor:not-allowed}
+/* sheet */
+#shBg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:50;display:none;align-items:flex-end}
+#shBg.on{display:flex}
+#sh{width:100%;background:#1a1a1a;border-radius:16px 16px 0 0;padding:20px 18px 36px}
+.drag{width:32px;height:4px;background:#333;border-radius:2px;margin:0 auto 16px}
+.tag{display:inline-flex;align-items:center;gap:6px;background:rgba(0,191,165,.1);border:1px solid #00bfa5;border-radius:6px;padding:5px 12px;margin-bottom:12px}
+.tagd{width:6px;height:6px;border-radius:50%;background:#00bfa5}
+.tagt{font-size:10px;font-weight:700;color:#00bfa5;letter-spacing:1px}
+#shPano{font-size:28px;font-weight:700;letter-spacing:2px;margin-bottom:4px}
+#shSip{font-size:11px;color:#888;margin-bottom:14px;font-family:monospace}
 .fields{display:grid;gap:6px;margin-bottom:16px}
-.field{display:flex;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:6px}
-.fl{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:2px;min-width:80px;flex-shrink:0;padding-top:2px}
-.fv{font-size:12px;font-family:monospace;color:var(--text);word-break:break-all}
-/* confidence indicator */
-.conf{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-.conf-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
-.conf-fill{height:100%;border-radius:2px;transition:width .4s}
-.conf-txt{font-size:10px;color:var(--muted);white-space:nowrap}
-.sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.btn-save{padding:14px;background:var(--accent);color:#000;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
-.btn-retry{padding:14px;background:transparent;color:var(--red);border:1.5px solid var(--red);border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
-.btn-edit{grid-column:1/-1;padding:10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer}
-.list-section{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px 10px}
-.list-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.list-hdr-title{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted)}
-.list-info{font-size:10px;color:var(--muted);font-family:monospace}
-.pitem{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:8px;padding:11px 13px;margin-bottom:6px;border-left:3px solid var(--accent);animation:itemin .3s}
-@keyframes itemin{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
-.pname{font-size:14px;font-weight:700}
-.psip{font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px}
-.pcnt{font-size:11px;font-weight:700;background:var(--surface2);color:var(--accent);padding:3px 10px;border-radius:12px}
-.empty{text-align:center;padding:32px;color:var(--muted)}
-.empty-ico{font-size:34px;margin-bottom:10px;opacity:.4}
-.empty-txt{font-size:12px;line-height:1.8}
-#dbg{position:absolute;bottom:87px;left:0;right:0;height:76px;background:rgba(0,0,0,.9);color:#00e676;font-family:monospace;font-size:10px;padding:5px 8px;overflow-y:auto;z-index:25;pointer-events:none}
-/* Edit modal */
-.edit-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
-.edit-modal.show{display:flex}
-.edit-box{background:var(--surface);border-radius:12px;padding:22px;width:100%;max-width:360px}
-.edit-box h3{font-size:15px;margin-bottom:14px}
-.edit-box input{width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;font-size:14px;font-family:monospace;margin-bottom:10px;outline:none}
-.edit-box input:focus{border-color:var(--accent)}
-.edit-box label{font-size:10px;color:var(--muted);letter-spacing:1px;display:block;margin-bottom:4px}
-.edit-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
-.btn-confirm{padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
-.btn-cancel{padding:12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:14px;cursor:pointer}
+.fi{display:flex;gap:10px;padding:8px 12px;background:#242424;border-radius:6px}
+.fl{font-size:9px;font-weight:700;color:#666;letter-spacing:2px;min-width:82px;flex-shrink:0;padding-top:2px}
+.fv{font-size:12px;font-family:monospace;color:#fff;word-break:break-all}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bsave{padding:14px;background:#00bfa5;color:#000;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
+.bretry{padding:14px;background:transparent;color:#f44336;border:1.5px solid #f44336;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
+.bedit{grid-column:1/-1;padding:10px;background:transparent;color:#888;border:1px solid #2a2a2a;border-radius:8px;font-size:12px;cursor:pointer;margin-top:2px}
+/* list */
+#listWrap{flex:1;overflow-y:auto;padding:12px 14px}
+.lhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.lhtitle{font-size:10px;font-weight:700;letter-spacing:2px;color:#555}
+.lhinfo{font-size:10px;color:#555;font-family:monospace}
+.pi{display:flex;align-items:center;justify-content:space-between;background:#1a1a1a;border-radius:8px;padding:11px 13px;margin-bottom:6px;border-left:3px solid #00bfa5}
+.pn{font-size:14px;font-weight:700}
+.ps{font-size:10px;color:#666;font-family:monospace;margin-top:2px}
+.pc{font-size:11px;font-weight:700;background:#222;color:#00bfa5;padding:3px 10px;border-radius:12px}
+.empty{text-align:center;padding:30px;color:#555}
+.eico{font-size:32px;margin-bottom:8px;opacity:.4}
+.etxt{font-size:12px;line-height:1.8}
+/* edit modal */
+#editM{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+#editM.on{display:flex}
+#editBox{background:#1a1a1a;border-radius:12px;padding:22px;width:100%;max-width:360px}
+#editBox h3{font-size:15px;margin-bottom:14px}
+#editBox label{font-size:10px;color:#666;letter-spacing:1px;display:block;margin-bottom:4px}
+#editBox input{width:100%;padding:11px;background:#242424;border:1px solid #333;color:#fff;border-radius:7px;font-size:14px;font-family:monospace;margin-bottom:10px;outline:none}
+#editBox input:focus{border-color:#00bfa5}
+.eacts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.eok{padding:12px;background:#00bfa5;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
+.eno{padding:12px;background:transparent;color:#888;border:1px solid #333;border-radius:8px;font-size:14px;cursor:pointer}
+/* debug */
+#dbg{position:absolute;bottom:85px;left:0;right:0;height:72px;background:rgba(0,0,0,.92);color:#00e676;font-family:monospace;font-size:10px;padding:5px 8px;overflow-y:auto;z-index:20;pointer-events:none}
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="hdr">
-    <div class="hdr-title">ETİKET TARAYICI</div>
-    <div class="hdr-right">
-      <div class="badge" id="ocrBadge">OCR YÜKLENİYOR</div>
-      <div class="badge on" id="cntBadge">0 ADET</div>
-    </div>
-  </div>
 
-  <div class="cam" id="camSection">
-    <video id="video" playsinline muted autoplay></video>
-    <img id="previewImg" alt="">
-    <div class="vf">
-      <div class="vfm t"></div><div class="vfm b"></div>
-      <div class="vfm l"></div><div class="vfm r"></div>
-      <div class="vf-frame">
-        <div class="corner tl"></div><div class="corner tr"></div>
-        <div class="corner bl"></div><div class="corner br"></div>
-      </div>
-      <div class="scanline" id="scanline"></div>
-      <div class="vf-label" id="vfLabel">OCR YÜKLENİYOR...</div>
-    </div>
-    <div class="proc" id="proc">
-      <div class="spinner"></div>
-      <div class="proc-txt">OKUNUYOR</div>
-      <div class="proc-step" id="procStep">Görüntü hazırlanıyor...</div>
-    </div>
-  </div>
+<div id="hdr">
+  <h1>ETİKET TARAYICI</h1>
+  <div id="cntBadge">0 ADET</div>
+</div>
 
-  <div class="action-bar">
-    <button class="btn-side zip" id="zipBtn" onclick="downloadZip()" disabled>⬇ ZIP</button>
-    <button class="btn-capture" id="captureBtn" onclick="captureAndOCR()">
-      <svg width="28" height="28" viewBox="0 0 28 28">
-        <circle cx="14" cy="14" r="10" stroke="white" stroke-width="2.5" fill="none"/>
-        <circle cx="14" cy="14" r="5" fill="white"/>
-      </svg>
-    </button>
-    <button class="btn-side" onclick="clearAll()">🗑 SİL</button>
+<div id="camBox">
+  <video id="video" playsinline muted autoplay></video>
+  <div id="vf">
+    <div class="dm t"></div><div class="dm b"></div>
+    <div class="dm l"></div><div class="dm r"></div>
+    <div id="frame"></div>
+    <div id="scanLine"></div>
+    <div id="vfTxt">BAŞLATILIYOR...</div>
   </div>
-
-  <div class="list-section">
-    <div class="list-hdr">
-      <div class="list-hdr-title">TARANAN PANOLAR</div>
-      <div class="list-info" id="listInfo">—</div>
-    </div>
-    <div id="panelList">
-      <div class="empty"><div class="empty-ico">📷</div><div class="empty-txt">Etiketi çerçeveye getirin<br>butona basın — OCR otomatik okur</div></div>
-    </div>
+  <div id="proc">
+    <div class="ring"></div>
+    <div id="procTxt">OKUNUYOR...</div>
   </div>
 </div>
 
-<!-- RESULT SHEET -->
-<div class="sheet-bg" id="sheetBg">
-  <div class="sheet">
-    <div class="sheet-drag"></div>
-    <div class="sheet-ok"><div class="sheet-ok-dot"></div><div class="sheet-ok-txt">ETİKET OKUNDU</div></div>
-    <div class="sheet-pano" id="sPano">—</div>
-    <div class="sheet-sip" id="sSip">—</div>
-    <div class="conf">
-      <div class="conf-bar"><div class="conf-fill" id="confFill" style="width:0%;background:var(--accent)"></div></div>
-      <div class="conf-txt" id="confTxt">Güven: —</div>
-    </div>
+<div id="bar">
+  <button class="sbtn z" id="zipBtn" onclick="downloadZip()" disabled>⬇ ZIP</button>
+  <div id="capBtn" onclick="capture()">
+    <svg width="28" height="28" viewBox="0 0 28 28">
+      <circle cx="14" cy="14" r="10" stroke="white" stroke-width="2.5" fill="none"/>
+      <circle cx="14" cy="14" r="5" fill="white"/>
+    </svg>
+  </div>
+  <button class="sbtn" onclick="clearAll()">🗑 SİL</button>
+</div>
+
+<div id="listWrap">
+  <div class="lhdr">
+    <div class="lhtitle">TARANAN PANOLAR</div>
+    <div class="lhinfo" id="lhinfo">—</div>
+  </div>
+  <div id="panelList">
+    <div class="empty"><div class="eico">📦</div><div class="etxt">Henüz tarama yapılmadı<br>Etiketi çerçeveye getirin, butona basın</div></div>
+  </div>
+</div>
+
+<!-- SHEET -->
+<div id="shBg">
+  <div id="sh">
+    <div class="drag"></div>
+    <div class="tag"><div class="tagd"></div><div class="tagt">ETİKET OKUNDU</div></div>
+    <div id="shPano">—</div>
+    <div id="shSip">—</div>
     <div class="fields">
-      <div class="field"><div class="fl">UPPER LIST</div><div class="fv" id="sUpper">—</div></div>
-      <div class="field"><div class="fl">PART NO</div><div class="fv" id="sPart">—</div></div>
+      <div class="fi"><div class="fl">UPPER LIST</div><div class="fv" id="shUpper">—</div></div>
+      <div class="fi"><div class="fl">PART NO</div><div class="fv" id="shPart">—</div></div>
     </div>
-    <div class="sheet-actions">
-      <button class="btn-save" onclick="confirmSave()">✓ KAYDET</button>
-      <button class="btn-retry" onclick="closeSheet()">✕ TEKRAR</button>
-      <button class="btn-edit" onclick="showEdit()">✏ Düzenle (yanlış okuma varsa)</button>
+    <div class="acts">
+      <button class="bsave" onclick="confirmSave()">✓ KAYDET</button>
+      <button class="bretry" onclick="closeSheet()">✕ TEKRAR</button>
+      <button class="bedit" onclick="openEdit()">✏ Düzenle</button>
     </div>
   </div>
 </div>
 
-<!-- EDIT MODAL -->
-<div class="edit-modal" id="editModal">
-  <div class="edit-box">
+<!-- EDIT -->
+<div id="editM">
+  <div id="editBox">
     <h3>✏ Sonucu Düzenle</h3>
-    <label>SİPARİŞ NO</label>
-    <input id="eSip" type="text" placeholder="7024055700">
-    <label>PANEL NO</label>
-    <input id="ePanel" type="text" placeholder="1 veya Accessories Kit">
-    <label>UPPER LIST</label>
-    <input id="eUpper" type="text" placeholder="8PQ...">
-    <label>PART NO</label>
-    <input id="ePart" type="text" placeholder="8PQ...">
-    <div class="edit-actions">
-      <button class="btn-confirm" onclick="applyEdit()">UYGULA</button>
-      <button class="btn-cancel" onclick="document.getElementById('editModal').classList.remove('show')">İPTAL</button>
+    <label>SİPARİŞ NO</label><input id="eSip" placeholder="7024055700">
+    <label>PANEL NO</label><input id="ePanel" placeholder="1 veya Accessories Kit">
+    <label>UPPER LIST</label><input id="eUpper" placeholder="8PQ...">
+    <label>PART NO</label><input id="ePart" placeholder="8PQ...">
+    <div class="eacts">
+      <button class="eok" onclick="applyEdit()">UYGULA</button>
+      <button class="eno" onclick="document.getElementById('editM').classList.remove('on')">İPTAL</button>
     </div>
   </div>
 </div>
 
 <div id="dbg">BAŞLATILIYOR...<br></div>
 <canvas id="canvas" style="display:none"></canvas>
-<canvas id="canvas2" style="display:none"></canvas>
 
 <script>
-const ST = { worker:null, panels:{}, total:0, blob:null, result:null, busy:false };
-const dbg = document.getElementById('dbg');
-function log(m){ dbg.innerHTML += '> '+m+'<br>'; dbg.scrollTop=dbg.scrollHeight; }
-function procStep(m){ document.getElementById('procStep').textContent = m; }
+const ST={panels:{},total:0,blob:null,result:null,busy:false,worker:null};
+const dbg=document.getElementById('dbg');
+function log(m){dbg.innerHTML+='> '+m+'<br>';dbg.scrollTop=dbg.scrollHeight;}
 
-/* ── CAMERA SIZE ── */
-function sizeCam(){
-  document.getElementById('camSection').style.height = Math.round(window.innerHeight*0.43)+'px';
-}
-window.addEventListener('resize', sizeCam);
-sizeCam();
+/* ── CAM SIZE ── */
+function size(){document.getElementById('camBox').style.height=Math.round(window.innerHeight*.44)+'px';}
+window.addEventListener('resize',size); size();
 
 /* ── CAMERA ── */
 async function startCam(){
-  const vid = document.getElementById('video');
-  const opts = [
+  const vid=document.getElementById('video');
+  const tries=[
     {video:{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}}},
-    {video:{facingMode:'environment',width:{ideal:1280}}},
     {video:{facingMode:'environment'}},
     {video:true}
   ];
-  for(const o of opts){
+  for(const t of tries){
     try{
-      const s = await navigator.mediaDevices.getUserMedia(o);
-      vid.srcObject = s;
-      await new Promise(r=>{ vid.onloadedmetadata=r; });
+      const s=await navigator.mediaDevices.getUserMedia(t);
+      vid.srcObject=s;
+      await new Promise(r=>{vid.onloadedmetadata=r;});
       vid.play();
       log('Kamera: '+vid.videoWidth+'x'+vid.videoHeight);
-      return true;
-    }catch(e){ log('Kamera denemesi: '+e.message); }
+      return;
+    }catch(e){log('Kamera: '+e.message);}
   }
-  log('HATA: Kamera açılamadı!');
-  return false;
 }
 
-/* ── OCR INIT ── */
-async function initOCR(){
+/* ── TESSERACT ── */
+async function startOCR(){
   log('Tesseract yükleniyor...');
-  document.getElementById('vfLabel').textContent = 'OCR YÜKLENİYOR...';
+  document.getElementById('vfTxt').textContent='OCR YÜKLENİYOR...';
   try{
-    ST.worker = await Tesseract.createWorker('eng', 1, { logger: m => {
-      if(m.status === 'recognizing text') procStep('Metin tanınıyor...');
-    }});
-    // Sadece etiket karakterleri
-    await ST.worker.setParameters({
-      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/-. ',
-      tessedit_pageseg_mode: '6',
-      preserve_interword_spaces: '1',
+    // v4 API — createWorker(lang, oem, options)
+    const w = await Tesseract.createWorker('eng');
+    await w.setParameters({
+      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/-. ',
+      tessedit_pageseg_mode:'6',
     });
-    log('OCR hazır.');
-    document.getElementById('ocrBadge').textContent = 'OCR HAZIR';
-    document.getElementById('ocrBadge').classList.add('on');
-    document.getElementById('vfLabel').textContent = 'ETİKETİ ÇERÇEVEYE GETİRİN';
-    document.getElementById('captureBtn').classList.add('ready');
+    ST.worker=w;
+    log('OCR hazır!');
+    document.getElementById('vfTxt').textContent='ETİKETİ ÇERÇEVEYE GETİRİN';
+    document.getElementById('capBtn').classList.add('on');
+  }catch(e){
+    log('OCR HATA: '+e.message);
+    document.getElementById('vfTxt').textContent='OCR HATASI — SAYFAYI YENİLEYİN';
+  }
+}
+
+/* ── CAPTURE ── */
+async function capture(){
+  if(ST.busy||!ST.worker)return;
+  ST.busy=true;
+
+  const vid=document.getElementById('video');
+  const cvs=document.getElementById('canvas');
+  if(!vid.videoWidth){ST.busy=false;return;}
+
+  // Görüntüyü al — 2x büyüt
+  const W=vid.videoWidth, H=vid.videoHeight;
+  cvs.width=W*2; cvs.height=H*2;
+  const ctx=cvs.getContext('2d');
+  ctx.scale(2,2);
+  ctx.drawImage(vid,0,0);
+  ctx.setTransform(1,0,0,1,0,0);
+
+  ST.blob=await new Promise(r=>cvs.toBlob(r,'image/jpeg',.88));
+
+  document.getElementById('proc').classList.add('on');
+  document.getElementById('capBtn').classList.remove('on');
+  document.getElementById('procTxt').textContent='OKUNUYOR...';
+
+  try{
+    const {data:{text,confidence}}=await ST.worker.recognize(cvs);
+    log('Güven:'+Math.round(confidence)+'% RAW:'+text.replace(/\n/g,'|').slice(0,100));
+    const r=parse(text);
+    document.getElementById('proc').classList.remove('on');
+    if(r.siparis||r.panel!=='Accessories Kit'){
+      showSheet(r);
+    }else{
+      log('Okunamadı — yaklaştırın');
+      document.getElementById('vfTxt').textContent='YAKINLAŞTIRIN — TEKRAR DENE';
+      document.getElementById('capBtn').classList.add('on');
+    }
   }catch(e){
     log('OCR hatası: '+e.message);
-  }
-}
-
-/* ── IMAGE PROCESSING ── */
-function processImage(srcCanvas, dstCanvas){
-  // 2x büyüt — threshold YOK, sadece kontrast artır
-  const SCALE = 2;
-  dstCanvas.width  = srcCanvas.width  * SCALE;
-  dstCanvas.height = srcCanvas.height * SCALE;
-  const ctx = dstCanvas.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.scale(SCALE, SCALE);
-  ctx.drawImage(srcCanvas, 0, 0);
-  ctx.setTransform(1,0,0,1,0,0);
-  // Sadece kontrast artır, threshold uygulama
-  const img = ctx.getImageData(0, 0, dstCanvas.width, dstCanvas.height);
-  const d = img.data;
-  for(let i=0; i<d.length; i+=4){
-    const r=d[i], g=d[i+1], b=d[i+2];
-    const gray = 0.299*r + 0.587*g + 0.114*b;
-    // Kontrast artır ama threshold yapma
-    const c = Math.min(255, Math.max(0, (gray - 128) * 1.8 + 128));
-    d[i]=d[i+1]=d[i+2]=c;
-  }
-  ctx.putImageData(img, 0, 0);
-}
-
-/* ── PARSE OCR TEXT ── */
-function parseOCR(text){
-  log('RAW: '+text.replace(/\n/g,'|').slice(0,120));
-  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
-  let siparis='', upper='', part='', panel='';
-  let confidence = 0;
-
-  for(const line of lines){
-    const up = line.toUpperCase();
-
-    // Sipariş no: 10 hane, 70 ile başlar
-    if(!siparis){
-      const m = line.match(/\b(70\d{8})\b/);
-      if(m){ siparis=m[1]; confidence+=35; log('Siparis: '+siparis); continue; }
-      // OCR bozuksa: 7O veya 0 yerine O olabilir
-      const m2 = line.replace(/O/g,'0').match(/\b(70\d{8})\b/);
-      if(m2){ siparis=m2[1]; confidence+=25; log('Siparis(fix): '+siparis); continue; }
-    }
-
-    // UPPER LIST
-    if(!upper && (up.includes('UPPER') || up.includes('UPPE'))){
-      const m = line.match(/([8][A-Z0-9]{2,}-[A-Z0-9-]+)/);
-      if(m){ upper=m[1]; confidence+=15; log('Upper: '+upper); }
-      continue;
-    }
-
-    // PART NO
-    if(!part && up.includes('PART') && !up.includes('PANEL')){
-      const m = line.match(/([8][A-Z0-9]{2,}-[A-Z0-9-]+)/);
-      if(m){ part=m[1]; confidence+=15; log('Part: '+part); }
-      continue;
-    }
-
-    // PANEL NO
-    if(up.includes('PANEL') || up.includes('PANE')){
-      // Sayı ara
-      const m = line.match(/(?:PANEL\s*NO\s*[:\s]*)?(\d{1,3})\s*$/i);
-      if(m){ panel=m[1]; confidence+=35; log('Panel: '+panel); continue; }
-      // Accessories Kit
-      if(up.includes('ACCESS') || up.includes('KIT')){
-        panel='Accessories Kit'; confidence+=30; log('Panel: Accessories Kit'); continue;
-      }
-      // Sadece rakam içeren satır
-      const m2 = line.match(/^\s*(\d{1,3})\s*$/);
-      if(m2){ panel=m2[1]; confidence+=25; log('Panel(izole): '+panel); continue; }
-    }
-  }
-
-  // Panel hala yok — izole tek/iki haneli sayı satırı ara
-  if(!panel){
-    for(const line of lines){
-      if(/^\d{1,3}$/.test(line.trim())){
-        panel=line.trim(); confidence+=15;
-        log('Panel(fallback): '+panel); break;
-      }
-    }
-  }
-  if(!panel) panel='Accessories Kit';
-
-  return { siparis, upper, part, panel, confidence: Math.min(100,confidence) };
-}
-
-/* ── CAPTURE + OCR ── */
-async function captureAndOCR(){
-  if(ST.busy || !ST.worker) return;
-  ST.busy = true;
-
-  const vid = document.getElementById('video');
-  const cvs = document.getElementById('canvas');
-  const cvs2 = document.getElementById('canvas2');
-  const prev = document.getElementById('previewImg');
-
-  if(!vid.videoWidth){ ST.busy=false; log('Kamera hazır değil.'); return; }
-
-  // 1. Ham görüntüyü al
-  cvs.width=vid.videoWidth; cvs.height=vid.videoHeight;
-  const ctx = cvs.getContext('2d');
-  ctx.drawImage(vid,0,0);
-
-  // Preview
-  prev.src = cvs.toDataURL('image/jpeg',0.85);
-  prev.style.display='block';
-  ST.blob = await new Promise(r=>cvs.toBlob(r,'image/jpeg',0.88));
-
-  // UI
-  document.getElementById('proc').classList.add('show');
-  document.getElementById('scanline').classList.add('off');
-  document.getElementById('captureBtn').classList.remove('ready');
-
-  try{
-    // 2. Görüntüyü işle
-    procStep('Görüntü işleniyor...');
-    processImage(cvs, cvs2);
-
-    // 3. OCR — tam görüntü
-    procStep('Metin taranıyor...');
-    const { data } = await ST.worker.recognize(cvs2);
-    log('Güven: '+Math.round(data.confidence)+'%');
-
-    // 4. Parse
-    const result = parseOCR(data.text);
-
-    // 5. Sipariş no yoksa — yeniden dene, sadece üst %40 bölge
-    if(!result.siparis){
-      procStep('Sipariş no aranıyor...');
-      const topCvs = document.createElement('canvas');
-      topCvs.width=cvs2.width; topCvs.height=Math.round(cvs2.height*0.35);
-      const tc = topCvs.getContext('2d');
-      tc.drawImage(cvs2,0,0,cvs2.width,topCvs.height,0,0,cvs2.width,topCvs.height);
-      const {data:d2} = await ST.worker.recognize(topCvs);
-      const r2 = parseOCR(d2.text);
-      if(r2.siparis) result.siparis = r2.siparis;
-    }
-
-    document.getElementById('proc').classList.remove('show');
-    prev.style.display='none';
-
-    if(result.siparis || result.panel){
-      showSheet(result);
-    } else {
-      log('Okunamadı — daha yakın tutun.');
-      document.getElementById('vfLabel').textContent = 'YAKINLAŞTIRIN VE TEKRAR DENE';
-      resetUI(false);
-    }
-  }catch(e){
-    log('HATA: '+e.message);
-    document.getElementById('proc').classList.remove('show');
-    prev.style.display='none';
-    resetUI(false);
+    document.getElementById('proc').classList.remove('on');
+    document.getElementById('capBtn').classList.add('on');
   }
   ST.busy=false;
 }
 
-/* ── SHEET ── */
-function showSheet(r){
-  ST.result = r;
-  const panelLabel = r.panel==='Accessories Kit'?'ACCESSORIES KIT':'PANO '+r.panel;
-  document.getElementById('sPano').textContent  = panelLabel;
-  document.getElementById('sSip').textContent   = r.siparis || '(okunamadı)';
-  document.getElementById('sUpper').textContent = r.upper   || '—';
-  document.getElementById('sPart').textContent  = r.part    || '—';
-  // Confidence bar
-  const conf = r.confidence || 0;
-  const fill = document.getElementById('confFill');
-  fill.style.width = conf+'%';
-  fill.style.background = conf>=70?'var(--accent)':conf>=40?'orange':'var(--red)';
-  document.getElementById('confTxt').textContent = 'Güven: '+conf+'%';
-  document.getElementById('sheetBg').classList.add('show');
+/* ── PARSE ── */
+function parse(text){
+  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  let sip='',upper='',part='',panel='';
+
+  for(const line of lines){
+    const up=line.toUpperCase();
+    // Sipariş no: 10 hane 70 ile başlar
+    if(!sip){
+      const m=line.replace(/[Oo]/g,'0').match(/\b(70\d{8})\b/);
+      if(m){sip=m[1];log('sip:'+sip);continue;}
+    }
+    // UPPER LIST
+    if(!upper&&(up.includes('UPPER')||up.includes('UPPE'))){
+      const m=line.match(/([8][A-Z0-9]{2,}-[A-Z0-9-]+)/);
+      if(m){upper=m[1];log('upper:'+upper);}
+      continue;
+    }
+    // PART NO
+    if(!part&&up.includes('PART')&&!up.includes('PANEL')){
+      const m=line.match(/([8][A-Z0-9]{2,}-[A-Z0-9-]+)/);
+      if(m){part=m[1];log('part:'+part);}
+      continue;
+    }
+    // PANEL NO
+    if(up.includes('PANEL')||up.includes('PANE')){
+      const m=line.match(/(\d{1,3})\s*$/);
+      if(m){panel=m[1];log('panel:'+panel);continue;}
+      if(up.includes('ACCESS')||up.includes('KIT')){panel='Accessories Kit';continue;}
+    }
+  }
+  // Panel bulunamadıysa izole sayı satırı
+  if(!panel){
+    for(const l of lines){
+      if(/^\d{1,3}$/.test(l)){panel=l;log('panel(fb):'+l);break;}
+    }
+  }
+  if(!panel)panel='Accessories Kit';
+  return{siparis:sip,upper,part,panel};
 }
 
-function showEdit(){
-  const r = ST.result;
-  document.getElementById('eSip').value   = r?.siparis||'';
-  document.getElementById('ePanel').value = r?.panel||'';
-  document.getElementById('eUpper').value = r?.upper||'';
-  document.getElementById('ePart').value  = r?.part||'';
-  document.getElementById('editModal').classList.add('show');
+/* ── SHEET ── */
+function showSheet(r){
+  ST.result=r;
+  document.getElementById('shPano').textContent=r.panel==='Accessories Kit'?'ACCESSORIES KIT':'PANO '+r.panel;
+  document.getElementById('shSip').textContent=r.siparis||'(okunamadı)';
+  document.getElementById('shUpper').textContent=r.upper||'—';
+  document.getElementById('shPart').textContent=r.part||'—';
+  document.getElementById('shBg').classList.add('on');
+}
+
+function openEdit(){
+  const r=ST.result||{};
+  document.getElementById('eSip').value=r.siparis||'';
+  document.getElementById('ePanel').value=r.panel||'';
+  document.getElementById('eUpper').value=r.upper||'';
+  document.getElementById('ePart').value=r.part||'';
+  document.getElementById('editM').classList.add('on');
 }
 
 function applyEdit(){
-  ST.result = {
-    siparis: document.getElementById('eSip').value.trim(),
-    panel:   document.getElementById('ePanel').value.trim() || 'Accessories Kit',
-    upper:   document.getElementById('eUpper').value.trim(),
-    part:    document.getElementById('ePart').value.trim(),
-    confidence: 100
+  ST.result={
+    siparis:document.getElementById('eSip').value.trim(),
+    panel:document.getElementById('ePanel').value.trim()||'Accessories Kit',
+    upper:document.getElementById('eUpper').value.trim(),
+    part:document.getElementById('ePart').value.trim(),
   };
-  document.getElementById('editModal').classList.remove('show');
+  document.getElementById('editM').classList.remove('on');
   showSheet(ST.result);
 }
 
 function confirmSave(){
-  const r = ST.result;
-  if(!r) return;
-  const panoPad = r.panel==='Accessories Kit'
-    ? 'Accessories_Kit'
-    : 'Pano_'+String(r.panel).padStart(2,'0');
-  const key = (r.siparis||'BILINMIYOR')+'_'+panoPad;
-  if(!ST.panels[key]) ST.panels[key]=[];
-  const idx = ST.panels[key].length+1;
-  ST.panels[key].push({name:key+'_'+String(idx).padStart(3,'0')+'.jpg', blob:ST.blob});
+  const r=ST.result;if(!r)return;
+  const pk=r.panel==='Accessories Kit'?'Accessories_Kit':'Pano_'+String(r.panel).padStart(2,'0');
+  const key=(r.siparis||'BILINMIYOR')+'_'+pk;
+  if(!ST.panels[key])ST.panels[key]=[];
+  const idx=ST.panels[key].length+1;
+  ST.panels[key].push({name:key+'_'+String(idx).padStart(3,'0')+'.jpg',blob:ST.blob});
   ST.total++;
-  document.getElementById('cntBadge').textContent = ST.total+' ADET';
+  document.getElementById('cntBadge').textContent=ST.total+' ADET';
   document.getElementById('zipBtn').disabled=false;
-  log('KAYIT: '+key+' ('+idx+'. foto)');
+  log('KAYIT: '+key);
   renderList(key);
   closeSheet();
 }
 
 function closeSheet(){
-  document.getElementById('sheetBg').classList.remove('show');
-  ST.result=null; ST.blob=null;
-  resetUI(true);
-}
-
-function resetUI(ok){
-  document.getElementById('scanline').classList.remove('off');
-  document.getElementById('vfLabel').textContent = ok
-    ? 'ETİKETİ ÇERÇEVEYE GETİRİN'
-    : 'DAHA YAKIN TUTUN — TEKRAR DENE';
-  document.getElementById('captureBtn').classList.add('ready');
+  document.getElementById('shBg').classList.remove('on');
+  ST.result=null;ST.blob=null;
+  document.getElementById('vfTxt').textContent='ETİKETİ ÇERÇEVEYE GETİRİN';
+  document.getElementById('capBtn').classList.add('on');
 }
 
 /* ── LIST ── */
-function renderList(newKey){
-  const list = document.getElementById('panelList');
-  const keys = Object.keys(ST.panels).sort();
-  document.getElementById('listInfo').textContent = ST.total+' foto / '+keys.length+' pano';
-  if(!keys.length){
-    list.innerHTML='<div class="empty"><div class="empty-ico">📷</div><div class="empty-txt">Henüz tarama yapılmadı</div></div>';
-    return;
-  }
+function renderList(nk){
+  const list=document.getElementById('panelList');
+  const keys=Object.keys(ST.panels).sort();
+  document.getElementById('lhinfo').textContent=ST.total+' foto / '+keys.length+' pano';
+  if(!keys.length){list.innerHTML='<div class="empty"><div class="eico">📦</div><div class="etxt">Henüz tarama yapılmadı</div></div>';return;}
   list.innerHTML=keys.map(k=>{
-    const spP=k.indexOf('_Pano_'), spA=k.indexOf('_Accessories_Kit');
+    const spP=k.indexOf('_Pano_'),spA=k.indexOf('_Accessories_Kit');
     let sip,pano;
     if(spP>-1){sip=k.slice(0,spP);pano='PANO '+k.slice(spP+6).replace(/^0+/,'');}
     else if(spA>-1){sip=k.slice(0,spA);pano='ACCESSORIES KIT';}
     else{sip=k;pano=k;}
-    return `<div class="pitem">
-      <div><div class="pname">${pano}</div><div class="psip">${sip}</div></div>
-      <div class="pcnt">${ST.panels[k].length} foto</div>
-    </div>`;
+    return`<div class="pi"><div><div class="pn">${pano}</div><div class="ps">${sip}</div></div><div class="pc">${ST.panels[k].length} foto</div></div>`;
   }).join('');
 }
 
 /* ── ZIP ── */
 async function downloadZip(){
   const btn=document.getElementById('zipBtn');
-  btn.textContent='...'; btn.disabled=true;
-  try{
-    const zip=new JSZip();
-    for(const [k,files] of Object.entries(ST.panels)){
-      const f=zip.folder(k);
-      for(const x of files) f.file(x.name,x.blob);
-    }
-    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download='Etiketler_'+new Date().toISOString().slice(0,10)+'.zip';
-    a.click();
-    log('ZIP indirildi.');
-  }catch(e){log('ZIP hatası: '+e.message);}
-  btn.textContent='⬇ ZIP'; btn.disabled=false;
+  btn.textContent='...';btn.disabled=true;
+  const zip=new JSZip();
+  for(const[k,files]of Object.entries(ST.panels)){
+    const f=zip.folder(k);
+    for(const x of files)f.file(x.name,x.blob);
+  }
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Etiketler_'+new Date().toISOString().slice(0,10)+'.zip';
+  a.click();
+  btn.textContent='⬇ ZIP';btn.disabled=false;
 }
 
-/* ── CLEAR ── */
 function clearAll(){
-  if(!Object.keys(ST.panels).length) return;
-  if(!confirm('Tüm taranan etiketler silinecek?')) return;
-  ST.panels={}; ST.total=0;
+  if(!Object.keys(ST.panels).length)return;
+  if(!confirm('Tüm taranan etiketler silinecek?'))return;
+  ST.panels={};ST.total=0;
   document.getElementById('cntBadge').textContent='0 ADET';
   document.getElementById('zipBtn').disabled=true;
   renderList(null);
@@ -545,7 +396,7 @@ function clearAll(){
 /* ── INIT ── */
 (async()=>{
   await startCam();
-  await initOCR();
+  await startOCR();
 })();
 </script>
 </body>
