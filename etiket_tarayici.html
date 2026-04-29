@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Siemens Etiket Tarayıcı - V8 (Endüstriyel)</title>
+    <title>Siemens Etiket Tarayıcı - V9</title>
     <style>
         :root {
             --bg-color: #121212; --surface-color: #1e1e1e;
@@ -53,7 +53,7 @@
 </head>
 <body>
 
-    <div id="debug-log">V8 (Auto-Retry) Başlatıldı.<br></div>
+    <div id="debug-log">V9 Başlatıldı. Hedef: Latest Flash Model<br></div>
 
     <div id="api-modal" class="hidden">
         <div class="modal-content">
@@ -157,13 +157,14 @@
                 const imageData = dataURL.split(',')[1];
                 
                 const promptText = "Görseldeki Siemens etiketini oku. Sadece JSON formatında şu alanları ver: siparis_no, upper_list, part_no, panel_no.";
-                const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+                
+                // --- İŞTE DÜZELTİLEN YER: gemini-1.5-flash-latest kullanıyoruz ---
+                const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + apiKey;
 
                 const requestBody = JSON.stringify({
                     contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }]
                 });
 
-                // HATA TOLERANSI: 3 Kez Deneme Döngüsü
                 let attempt = 0;
                 let maxAttempts = 3;
                 let success = false;
@@ -178,33 +179,25 @@
                         body: requestBody
                     });
 
-                    // Eğer sunucu yoğunsa (503) bekle ve tekrar dene
                     if (response.status === 503) {
-                        sysLog("Sunucu yoğun (503). 1 saniye bekleniyor...");
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        sysLog("Sunucu yoğun (503). Bekleniyor...");
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                         continue; 
                     }
 
                     if (!response.ok) {
                         const errorText = await response.text();
                         sysLog(`API Hatası ${response.status}: ${errorText.substring(0,40)}`);
-                        break; // 503 dışındaki hatalarda döngüyü kır
+                        break; 
                     }
 
                     const data = await response.json();
                     
                     if (data.error) {
-                        if (data.error.code === 503) {
-                            sysLog("Sunucu meşgul. Bekleniyor...");
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                            continue;
-                        } else {
-                            sysLog("API REDDETTİ: " + data.error.message);
-                            break;
-                        }
+                        sysLog("API REDDETTİ: " + data.error.message);
+                        break;
                     }
                     
-                    // Veriyi Başarıyla Okuduk
                     if (data.candidates && data.candidates[0].content) {
                         let rawText = data.candidates[0].content.parts[0].text;
                         let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -214,7 +207,7 @@
                             if (panoNo.toString().trim() === "") panoNo = "Accessories Kit";
                             sysLog("BAŞARILI: Pano " + panoNo);
                             addToList(result.siparis_no, panoNo, result.part_no);
-                            success = true; // Döngüden çık
+                            success = true; 
                         } catch (e) {
                             sysLog("JSON Hatası: " + cleanText.substring(0, 20));
                             break;
@@ -226,7 +219,7 @@
                 }
 
                 if (!success && attempt >= maxAttempts) {
-                    sysLog("HATA: Sunucu şu an çok yoğun, lütfen birazdan tekrar deneyin.");
+                    sysLog("HATA: Tüm denemeler başarısız oldu.");
                 }
 
             } catch (error) {
