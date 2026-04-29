@@ -1,617 +1,247 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<title>Etiket Tarayıcı</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Panel Aksesuar Tarayıcı</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #009999; /* Siemens tarzı endüstriyel turkuaz/yeşil */
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+        }
 
-:root{
-  --bg:#060608;
-  --s1:#0d0d12;
-  --s2:#13131c;
-  --border:#1e1e2e;
-  --accent:#5b6ef5;
-  --accent-glow:rgba(91,110,245,0.3);
-  --green:#22d3a5;
-  --green-glow:rgba(34,211,165,0.25);
-  --amber:#f5a623;
-  --red:#f54b5e;
-  --text:#f0f0fa;
-  --muted:#4a4a6a;
-  --card:#0f0f18;
-}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
 
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Space Mono',monospace}
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-/* ── LAYOUT ── */
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+        /* Üst Kısım: Kamera (Ekranın yarısı) */
+        #camera-container {
+            flex: 1;
+            background-color: #000;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
 
-/* ── HEADER ── */
-.hdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 18px 12px;
-  background:var(--s1);
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-  position:relative;
-  z-index:10;
-}
-.hdr-logo{
-  font-family:'Syne',sans-serif;
-  font-size:17px;font-weight:800;
-  letter-spacing:.5px;
-  background:linear-gradient(135deg,var(--accent),var(--green));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
-.hdr-right{display:flex;align-items:center;gap:10px}
-.pill{
-  font-size:10px;font-weight:700;letter-spacing:1.5px;
-  padding:4px 12px;border-radius:20px;
-  background:var(--s2);border:1px solid var(--border);
-  color:var(--muted);transition:all .3s;
-}
-.pill.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
-.pill.ok{background:var(--green-glow);border-color:var(--green);color:var(--green)}
+        #camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Kameranın ekranı tam kaplaması için */
+        }
 
-/* ── CAMERA WRAP ── */
-.cam-wrap{
-  position:relative;flex-shrink:0;
-  background:#000;overflow:hidden;
-}
-#video{width:100%;height:100%;object-fit:cover;display:block}
+        /* Hedef Çerçevesi (Kullanıcıya nereyi okutacağını göstermek için) */
+        .scan-frame {
+            position: absolute;
+            width: 80%;
+            height: 40%;
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4); /* Çerçevenin dışını karartır */
+            pointer-events: none;
+        }
 
-/* Viewfinder */
-.vf{position:absolute;inset:0;pointer-events:none}
-.vf-dark-top,.vf-dark-bot,.vf-dark-left,.vf-dark-right{
-  position:absolute;background:rgba(6,6,8,.55);
-}
-.vf-dark-top{top:0;left:0;right:0;height:20%}
-.vf-dark-bot{bottom:0;left:0;right:0;height:20%}
-.vf-dark-left{top:20%;bottom:20%;left:0;width:5%}
-.vf-dark-right{top:20%;bottom:20%;right:0;width:5%}
+        /* Orta Kısım: Aksiyon Butonu */
+        #action-bar {
+            height: 80px;
+            background-color: var(--surface-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+        }
 
-.vf-box{
-  position:absolute;
-  top:20%;left:5%;right:5%;bottom:20%;
-  border:1.5px solid rgba(91,110,245,.5);
-}
-/* Corner accents */
-.vf-box::before,.vf-box::after,
-.vf-tl,.vf-tr,.vf-bl,.vf-br{
-  position:absolute;width:22px;height:22px;
-  border-color:var(--accent);border-style:solid;
-}
-.vf-tl{top:-1px;left:-1px;border-width:2.5px 0 0 2.5px}
-.vf-tr{top:-1px;right:-1px;border-width:2.5px 2.5px 0 0}
-.vf-bl{bottom:-1px;left:-1px;border-width:0 0 2.5px 2.5px}
-.vf-br{bottom:-1px;right:-1px;border-width:0 2.5px 2.5px 0}
+        #capture-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            border: 4px solid var(--surface-color);
+            outline: 2px solid var(--primary-color);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
 
-/* Scan beam */
-.beam{
-  position:absolute;left:5%;right:5%;
-  height:2px;
-  background:linear-gradient(90deg,transparent 0%,var(--accent) 30%,#fff 50%,var(--accent) 70%,transparent 100%);
-  box-shadow:0 0 12px 2px var(--accent-glow);
-  animation:beam 2.8s cubic-bezier(.4,0,.6,1) infinite;
-  top:20%;
-  display:none;
-}
-.beam.active{display:block}
-@keyframes beam{
-  0%{top:20%;opacity:0}
-  5%{opacity:1}
-  95%{opacity:1}
-  100%{top:80%;opacity:0}
-}
+        #capture-btn:active {
+            transform: scale(0.95);
+        }
 
-/* OCR state indicator inside viewfinder */
-.vf-state{
-  position:absolute;bottom:21%;left:50%;transform:translateX(-50%);
-  font-size:10px;letter-spacing:2px;color:var(--accent);
-  background:rgba(6,6,8,.75);
-  padding:4px 14px;border-radius:20px;
-  border:1px solid var(--accent);
-  white-space:nowrap;
-}
+        /* Alt Kısım: Liste */
+        #list-container {
+            flex: 1;
+            background-color: var(--surface-color);
+            padding: 15px;
+            overflow-y: auto;
+        }
 
-/* ── STATUS ── */
-.status{
-  flex-shrink:0;
-  padding:10px 18px;
-  background:var(--s1);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:10px;min-height:44px;
-}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
-.dot.scanning{background:var(--accent);animation:blink 1.2s infinite}
-.dot.ok{background:var(--green)}
-.dot.err{background:var(--red)}
-.dot.warn{background:var(--amber)}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
-.status-msg{font-size:11px;color:var(--muted);flex:1;line-height:1.4}
-.status-msg b{color:var(--text)}
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
 
-/* ── RESULT CARD ── */
-.result-card{
-  flex-shrink:0;
-  margin:10px 14px;
-  background:var(--card);
-  border:1px solid var(--accent);
-  border-radius:10px;
-  overflow:hidden;
-  display:none;
-  box-shadow:0 0 24px var(--accent-glow);
-  animation:slideUp .25s ease;
-}
-.result-card.show{display:block}
-@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        .header-row h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
 
-.result-card-header{
-  background:linear-gradient(135deg,rgba(91,110,245,.15),rgba(34,211,165,.08));
-  padding:10px 14px;
-  display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--border);
-}
-.result-card-title{font-size:9px;letter-spacing:3px;color:var(--accent);font-weight:700}
-.panel-badge{
-  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
-  color:var(--green);letter-spacing:1px;
-}
+        .counter {
+            background-color: var(--primary-color);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
 
-.result-fields{padding:10px 14px;display:grid;gap:6px}
-.rf{display:flex;gap:8px;align-items:baseline}
-.rf-label{font-size:9px;letter-spacing:2px;color:var(--muted);min-width:80px;flex-shrink:0}
-.rf-val{font-size:12px;color:var(--text);font-weight:700;word-break:break-all}
+        /* API Key Modal (İlk girişte sorulacak) */
+        #api-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
 
-.result-actions{display:flex;gap:0;border-top:1px solid var(--border)}
-.btn-save{
-  flex:1;padding:13px;
-  background:var(--green);color:#060608;
-  border:none;font-family:'Space Mono',monospace;
-  font-size:12px;font-weight:700;letter-spacing:2px;
-  cursor:pointer;transition:opacity .15s;
-}
-.btn-save:active{opacity:.8}
-.btn-skip{
-  flex:1;padding:13px;
-  background:transparent;color:var(--red);
-  border:none;border-left:1px solid var(--border);
-  font-family:'Space Mono',monospace;
-  font-size:12px;font-weight:700;letter-spacing:2px;
-  cursor:pointer;
-}
+        .modal-content {
+            background: var(--surface-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+        }
 
-/* ── SCROLL AREA ── */
-.scroll-area{flex:1;overflow-y:auto;padding:10px 14px 90px;-webkit-overflow-scrolling:touch}
+        .modal-content h3 { margin-bottom: 15px; }
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 4px;
+        }
+        .modal-content button {
+            width: 100%;
+            padding: 10px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .hidden { display: none !important; }
 
-.section-label{
-  font-size:9px;letter-spacing:3px;color:var(--muted);
-  margin-bottom:8px;
-}
-
-/* Panel cards */
-.panel-grid{display:grid;gap:6px}
-.pc{
-  display:flex;align-items:center;justify-content:space-between;
-  background:var(--s2);border:1px solid var(--border);
-  border-radius:8px;padding:11px 14px;
-  transition:border-color .2s;
-}
-.pc.new{border-color:var(--green);animation:flash .6s ease}
-@keyframes flash{0%{background:rgba(34,211,165,.15)}100%{background:var(--s2)}}
-.pc-left{}
-.pc-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--accent)}
-.pc-sub{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.5px}
-.pc-count{
-  font-size:11px;font-weight:700;
-  background:var(--border);color:var(--text);
-  padding:4px 10px;border-radius:12px;
-}
-
-.empty{text-align:center;padding:32px 20px;color:var(--muted)}
-.empty-icon{font-size:36px;margin-bottom:10px;opacity:.5}
-.empty-text{font-size:11px;letter-spacing:1px;line-height:1.7}
-
-/* ── BOTTOM BAR ── */
-.btm{
-  position:fixed;bottom:0;left:0;right:0;
-  padding:10px 14px;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom));
-  background:var(--s1);border-top:1px solid var(--border);
-  display:flex;gap:8px;z-index:20;
-}
-.btn-zip{
-  flex:1;padding:14px;
-  background:linear-gradient(135deg,var(--accent),#7c3aed);
-  color:#fff;border:none;border-radius:8px;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;
-  letter-spacing:1px;cursor:pointer;
-  box-shadow:0 4px 20px var(--accent-glow);
-  transition:opacity .15s,transform .1s;
-}
-.btn-zip:active{transform:scale(.97);opacity:.9}
-.btn-zip:disabled{opacity:.3;box-shadow:none;cursor:not-allowed}
-.btn-clr{
-  padding:14px 16px;
-  background:transparent;color:var(--muted);
-  border:1px solid var(--border);border-radius:8px;
-  font-family:'Space Mono',monospace;font-size:11px;
-  cursor:pointer;transition:color .2s,border-color .2s;
-}
-.btn-clr:active{color:var(--red);border-color:var(--red)}
-
-canvas{display:none}
-</style>
+    </style>
 </head>
 <body>
-<div class="app">
 
-  <!-- HEADER -->
-  <div class="hdr">
-    <div class="hdr-logo">ETİKET TARAYICI</div>
-    <div class="hdr-right">
-      <div class="pill" id="scanPill">HAZIR DEĞİL</div>
-      <div class="pill" id="cntPill">0 ADET</div>
+    <!-- API Key Giriş Ekranı -->
+    <div id="api-modal" class="hidden">
+        <div class="modal-content">
+            <h3>Sistem Kurulumu</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Lütfen Gemini API anahtarınızı girin. Bu anahtar sadece bu cihazda saklanacaktır.</p>
+            <input type="text" id="api-key-input" placeholder="AIzaSy...">
+            <button onclick="saveApiKey()">Kaydet ve Başla</button>
+        </div>
     </div>
-  </div>
 
-  <!-- CAMERA -->
-  <div class="cam-wrap" id="camWrap">
-    <video id="video" autoplay playsinline muted></video>
-    <div class="vf">
-      <div class="vf-dark-top"></div>
-      <div class="vf-dark-bot"></div>
-      <div class="vf-dark-left"></div>
-      <div class="vf-dark-right"></div>
-      <div class="vf-box">
-        <div class="vf-tl"></div><div class="vf-tr"></div>
-        <div class="vf-bl"></div><div class="vf-br"></div>
-      </div>
-      <div class="beam" id="beam"></div>
-      <div class="vf-state" id="vfState">Başlatılıyor...</div>
+    <!-- Üst: Kamera -->
+    <div id="camera-container">
+        <video id="camera-feed" autoplay playsinline></video>
+        <div class="scan-frame"></div>
     </div>
-  </div>
 
-  <!-- STATUS -->
-  <div class="status">
-    <div class="dot" id="dot"></div>
-    <div class="status-msg" id="statusMsg">Kamera başlatılıyor...</div>
-  </div>
-
-  <!-- RESULT CARD -->
-  <div class="result-card" id="resultCard">
-    <div class="result-card-header">
-      <div class="result-card-title">ETİKET OKUNDU</div>
-      <div class="panel-badge" id="rPanelBig">—</div>
+    <!-- Orta: Yakalama Butonu -->
+    <div id="action-bar">
+        <button id="capture-btn" onclick="captureImage()"></button>
     </div>
-    <div class="result-fields">
-      <div class="rf"><div class="rf-label">SİPARİŞ</div><div class="rf-val" id="rSiparis">—</div></div>
-      <div class="rf"><div class="rf-label">UPPER LIST</div><div class="rf-val" id="rUpper">—</div></div>
-      <div class="rf"><div class="rf-label">PART NO</div><div class="rf-val" id="rPart">—</div></div>
-      <div class="rf"><div class="rf-label">PANEL NO</div><div class="rf-val" id="rPanel">—</div></div>
+
+    <!-- Alt: Tarananlar Listesi -->
+    <div id="list-container">
+        <div class="header-row">
+            <h2>TARANAN PANOLAR</h2>
+            <div class="counter" id="total-count">0</div>
+        </div>
+        <div id="scanned-list" style="color: var(--text-muted); font-size: 14px; text-align: center; margin-top: 20px;">
+            Henüz tarama yapılmadı.
+        </div>
     </div>
-    <div class="result-actions">
-      <button class="btn-save" onclick="confirmResult()">✓ KAYDET</button>
-      <button class="btn-skip" onclick="retryResult()">✕ TEKRAR</button>
-    </div>
-  </div>
 
-  <!-- SCROLL -->
-  <div class="scroll-area">
-    <div class="section-label">TARANAN PANOLAR</div>
-    <div class="panel-grid" id="panelGrid">
-      <div class="empty">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-text">Etiketi çerçeve içine getirin<br>Otomatik okuma başlar</div>
-      </div>
-    </div>
-  </div>
+    <script>
+        // --- 1. API Key Kontrolü ---
+        function checkApiKey() {
+            const apiKey = localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                document.getElementById('api-modal').classList.remove('hidden');
+            } else {
+                startCamera();
+            }
+        }
 
-  <!-- BOTTOM -->
-  <div class="btm">
-    <button class="btn-zip" id="zipBtn" onclick="downloadZip()" disabled>ZIP İNDİR</button>
-    <button class="btn-clr" onclick="clearAll()">SİL</button>
-  </div>
-</div>
+        function saveApiKey() {
+            const input = document.getElementById('api-key-input').value.trim();
+            if (input) {
+                localStorage.setItem('gemini_api_key', input);
+                document.getElementById('api-modal').classList.add('hidden');
+                startCamera();
+            } else {
+                alert("Lütfen geçerli bir API anahtarı girin.");
+            }
+        }
 
-<canvas id="canvas"></canvas>
+        // --- 2. Kamera Başlatma ---
+        async function startCamera() {
+            const videoElement = document.getElementById('camera-feed');
+            try {
+                // Arka kamerayı zorunlu kıl (environment)
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                videoElement.srcObject = stream;
+            } catch (err) {
+                console.error("Kamera açılamadı:", err);
+                alert("Kameraya erişilemedi! Lütfen tarayıcı ayarlarından kamera izni verdiğinizden emin olun.");
+            }
+        }
 
-<script>
-/* ── STATE ── */
-const S = {
-  panels:{}, total:0,
-  scanning:false, busy:false, cooldown:false,
-  worker:null, timer:null,
-  lastResult:null, capturedBlob:null,
-};
+        // --- 3. Fotoğraf Çekme (Şimdilik sadece test) ---
+        function captureImage() {
+            console.log("Fotoğraf çekildi! İkinci aşamada bu görüntüyü Gemini'ye göndereceğiz.");
+            // Butona basıldığını hissettirmek için kısa bir efekt
+            const btn = document.getElementById('capture-btn');
+            btn.style.backgroundColor = "white";
+            setTimeout(() => { btn.style.backgroundColor = "var(--primary-color)"; }, 100);
+        }
 
-/* ── CAMERA SIZE ── */
-function sizeCam(){
-  const wrap = document.getElementById('camWrap');
-  const vh = window.innerHeight;
-  // camera takes ~45% of screen
-  wrap.style.height = Math.round(vh * 0.44) + 'px';
-}
-window.addEventListener('resize', sizeCam);
-sizeCam();
-
-/* ── INIT ── */
-async function init(){
-  await startCamera();
-  await initOCR();
-}
-
-async function startCamera(){
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}}
-    });
-    const vid = document.getElementById('video');
-    vid.srcObject = stream;
-    await new Promise(r => vid.onloadedmetadata = r);
-    setStatus('scanning','Kamera hazır — OCR yükleniyor...');
-  }catch(e){
-    setStatus('err','Kamera hatası: '+e.message);
-    vfState('HATA');
-  }
-}
-
-async function initOCR(){
-  vfState('OCR YÜKLENİYOR');
-  S.worker = await Tesseract.createWorker('eng',1,{logger:()=>{}});
-  await S.worker.setParameters({
-    tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/.\\- ',
-    tessedit_pageseg_mode:'6',  // uniform block of text
-  });
-  S.scanning = true;
-  setPill('scanPill','TARAMA AKTİF','active');
-  setStatus('scanning','Etiketi çerçeve içine getirin');
-  vfState('TARAMA AKTİF');
-  document.getElementById('beam').classList.add('active');
-  scheduleNext();
-}
-
-/* ── SCAN LOOP ── */
-function scheduleNext(){
-  clearTimeout(S.timer);
-  S.timer = setTimeout(doScan, 3000);
-}
-
-async function doScan(){
-  if(!S.scanning || S.busy || S.cooldown) return scheduleNext();
-  S.busy = true;
-  vfState('OKUNUYOR...');
-
-  const result = await captureAndOCR();
-  S.busy = false;
-
-  if(result && result.siparis && result.panel){
-    S.cooldown = true;
-    S.scanning = false;
-    document.getElementById('beam').classList.remove('active');
-    showResult(result);
-  } else {
-    vfState('TARAMA AKTİF');
-    scheduleNext();
-  }
-}
-
-/* ── CAPTURE + OCR ── */
-async function captureAndOCR(){
-  const vid = document.getElementById('video');
-  const cvs = document.getElementById('canvas');
-  if(vid.readyState < 2 || !vid.videoWidth) return null;
-
-  const vw = vid.videoWidth, vh = vid.videoHeight;
-
-  // Crop: middle 90% width, 60% height (etiket bölgesi)
-  const cw = Math.floor(vw * 0.90);
-  const ch = Math.floor(vh * 0.60);
-  const cx = Math.floor((vw - cw) / 2);
-  const cy = Math.floor((vh - ch) / 2);
-
-  // Upscale for better OCR
-  const scale = 2;
-  cvs.width  = cw * scale;
-  cvs.height = ch * scale;
-  const ctx = cvs.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.scale(scale, scale);
-  ctx.drawImage(vid, cx, cy, cw, ch, 0, 0, cw, ch);
-  ctx.setTransform(1,0,0,1,0,0);
-
-  // Enhance contrast
-  const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
-  enhance(imgData);
-  ctx.putImageData(imgData, 0, 0);
-
-  try{
-    const {data:{text}} = await S.worker.recognize(cvs);
-    console.log('OCR:', text);
-    return parseLabel(text);
-  }catch(e){
-    console.error(e);
-    return null;
-  }
-}
-
-function enhance(imgData){
-  const d = imgData.data;
-  for(let i=0;i<d.length;i+=4){
-    // Grayscale
-    const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-    // Increase contrast
-    const c = Math.min(255, Math.max(0, (g - 128) * 1.6 + 128 + 10));
-    d[i] = d[i+1] = d[i+2] = c;
-  }
-}
-
-/* ── PARSE ── */
-function parseLabel(text){
-  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
-  let siparis='', upper='', part='', panel='';
-
-  for(const line of lines){
-    const up = line.toUpperCase();
-
-    // Sipariş no: 10 haneli, 70 ile başlar
-    if(!siparis){
-      const m = line.match(/\b(70\d{8})\b/);
-      if(m){ siparis=m[1]; continue; }
-    }
-
-    // UPPER LIST: 8PQ ile başlayan
-    if(!upper && (up.includes('UPPER') || up.includes('UPPE'))){
-      const m = line.match(/([8][A-Z0-9]{2,}\d[A-Z0-9\-]+)/);
-      if(m) upper=m[1];
-      continue;
-    }
-
-    // PART NO
-    if(!part && up.includes('PART') && !up.includes('PANEL')){
-      const m = line.match(/([8][A-Z0-9]{2,}\d[A-Z0-9\-]+)/);
-      if(m) part=m[1];
-      continue;
-    }
-
-    // PANEL NO — en kritik kısım
-    if(up.includes('PANEL')){
-      // "PANEL NO:1" veya "PANEL NO: A01" veya "PANEL NO:Accessories Kit"
-      let m = line.match(/PANEL\s*NO\s*[:\s]+([A-Za-z0-9]+(?:\s+Kit)?)/i);
-      if(m){
-        panel = m[1].trim();
-        if(up.includes('ACCESSORIES') || up.includes('KIT')) panel='Accessories Kit';
-      }
-      continue;
-    }
-  }
-
-  // Panel bulunamadı — satırlarda izole 1-3 haneli sayı ara
-  if(!panel){
-    for(const line of lines){
-      if(/^\d{1,3}$/.test(line.trim())){ panel=line.trim(); break; }
-    }
-  }
-
-  if(!siparis || !panel) return null;
-  return {siparis, upper, part, panel};
-}
-
-/* ── SHOW RESULT ── */
-async function showResult(result){
-  S.lastResult = result;
-
-  // Capture jpeg
-  const cvs = document.getElementById('canvas');
-  S.capturedBlob = await new Promise(r=>cvs.toBlob(r,'image/jpeg',0.90));
-
-  document.getElementById('rPanelBig').textContent = 'PANO '+result.panel;
-  document.getElementById('rSiparis').textContent  = result.siparis;
-  document.getElementById('rUpper').textContent    = result.upper || '—';
-  document.getElementById('rPart').textContent     = result.part  || '—';
-  document.getElementById('rPanel').textContent    = result.panel;
-
-  document.getElementById('resultCard').classList.add('show');
-  setPill('scanPill','ONAY BEKLİYOR','ok');
-  setStatus('ok','<b>Pano '+result.panel+'</b> okundu — kaydedin veya tekrar tarayın');
-  vfState('✓ OKUNDU');
-}
-
-function confirmResult(){
-  const r = S.lastResult;
-  if(!r) return;
-  const key = r.siparis+'_Pano_'+String(r.panel).padStart(2,'0');
-  if(!S.panels[key]) S.panels[key]=[];
-  const idx = S.panels[key].length+1;
-  S.panels[key].push({name:`${key}_${String(idx).padStart(3,'0')}.jpg`, blob:S.capturedBlob});
-  S.total++;
-  document.getElementById('cntPill').textContent = S.total+' ADET';
-  document.getElementById('zipBtn').disabled = false;
-  renderPanels(key);
-  retryResult();
-}
-
-function retryResult(){
-  document.getElementById('resultCard').classList.remove('show');
-  S.lastResult=null; S.capturedBlob=null;
-  S.scanning=true; S.cooldown=false;
-  document.getElementById('beam').classList.add('active');
-  setPill('scanPill','TARAMA AKTİF','active');
-  setStatus('scanning','Etiketi çerçeve içine getirin');
-  vfState('TARAMA AKTİF');
-  scheduleNext();
-}
-
-/* ── RENDER ── */
-function renderPanels(newKey){
-  const grid = document.getElementById('panelGrid');
-  const keys = Object.keys(S.panels).sort();
-  if(!keys.length){
-    grid.innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Etiketi çerçeve içine getirin<br>Otomatik okuma başlar</div></div>`;
-    return;
-  }
-  grid.innerHTML = keys.map(k=>{
-    const parts = k.split('_Pano_');
-    const sip = parts[0], pano = 'PANO '+(parts[1]||'');
-    const cnt = S.panels[k].length;
-    return `<div class="pc ${k===newKey?'new':''}">
-      <div class="pc-left">
-        <div class="pc-name">${pano}</div>
-        <div class="pc-sub">${sip}</div>
-      </div>
-      <div class="pc-count">${cnt} foto</div>
-    </div>`;
-  }).join('');
-}
-
-/* ── ZIP ── */
-async function downloadZip(){
-  const btn=document.getElementById('zipBtn');
-  btn.textContent='HAZIRLANIYOR...'; btn.disabled=true;
-  const zip=new JSZip();
-  for(const [key,files] of Object.entries(S.panels)){
-    const folder=zip.folder(key);
-    for(const f of files) folder.file(f.name,f.blob);
-  }
-  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`Etiketler_${new Date().toISOString().slice(0,10)}.zip`;
-  a.click();
-  btn.textContent='ZIP İNDİR'; btn.disabled=false;
-}
-
-/* ── CLEAR ── */
-function clearAll(){
-  if(!Object.keys(S.panels).length) return;
-  if(!confirm('Tüm taranan etiketler silinecek?')) return;
-  S.panels={}; S.total=0;
-  document.getElementById('cntPill').textContent='0 ADET';
-  document.getElementById('zipBtn').disabled=true;
-  renderPanels(null);
-}
-
-/* ── HELPERS ── */
-function setStatus(type,msg){
-  const dot=document.getElementById('dot');
-  dot.className='dot '+type;
-  document.getElementById('statusMsg').innerHTML=msg;
-}
-function setPill(id,txt,cls){
-  const p=document.getElementById(id);
-  p.textContent=txt; p.className='pill'+(cls?' '+cls:'');
-}
-function vfState(txt){ document.getElementById('vfState').textContent=txt; }
-
-/* ── START ── */
-init();
-</script>
+        // Uygulama açıldığında API Key'i kontrol et
+        window.onload = checkApiKey;
+    </script>
 </body>
 </html>
