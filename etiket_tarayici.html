@@ -1,253 +1,509 @@
 <!DOCTYPE html>
-<!-- Tarayıcının kodu bozmasını engellemek için translate="no" eklendi -->
 <html lang="tr" translate="no">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Google Çeviri'yi zorla kapatan meta etiketi -->
-    <meta name="google" content="notranslate">
-    <title>Siemens Etiket Tarayıcı - V10</title>
-    <style>
-        :root {
-            --bg-color: #121212; --surface-color: #1e1e1e;
-            --primary-color: #009999; --text-main: #ffffff; --text-muted: #aaaaaa;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="google" content="notranslate">
+<title>Etiket Tarayıcı</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0e0e;--surface:#1a1a1a;--surface2:#242424;
+  --accent:#00bfa5;--accent2:#ff6f00;--red:#f44336;
+  --text:#ffffff;--muted:#888;--border:#2e2e2e;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+/* MODAL */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.modal.hide{display:none}
+.modal-box{background:var(--surface);border-radius:12px;padding:24px;width:100%;max-width:380px}
+.modal-box h2{font-size:18px;margin-bottom:6px}
+.modal-box p{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6}
+.modal-box input{width:100%;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:14px;margin-bottom:12px;outline:none}
+.modal-box input:focus{border-color:var(--accent)}
+.btn-full{width:100%;padding:13px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
 
-        #debug-log {
-            position: absolute; bottom: 80px; left: 0; width: 100%; height: 90px; 
-            background: rgba(0, 0, 0, 0.85); color: #00e676; font-family: monospace; 
-            font-size: 11px; padding: 5px; overflow-y: auto; z-index: 9999; pointer-events: none;
-        }
+/* HEADER */
+.hdr{flex-shrink:0;height:50px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.hdr-title{font-size:14px;font-weight:700;letter-spacing:1px;color:var(--accent)}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.badge.on{background:rgba(0,191,165,.15);color:var(--accent);border-color:var(--accent)}
+.btn-settings{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px}
 
-        #camera-container { flex: 1; background-color: #000; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        #camera-feed { width: 100%; height: 100%; object-fit: cover; }
-        
-        #preview-img {
-            position: absolute; width: 100%; height: 100%; object-fit: contain;
-            background-color: rgba(0,0,0,0.9); z-index: 20; display: none;
-        }
+/* CAMERA */
+.cam{flex-shrink:0;position:relative;background:#000;overflow:hidden}
+video{width:100%;height:100%;object-fit:cover;display:block}
+#previewImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:rgba(0,0,0,.9);display:none;z-index:5}
 
-        .scan-frame { position: absolute; width: 70%; height: 35%; border: 2px dashed rgba(255, 255, 255, 0.5); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4); pointer-events: none; z-index: 10;}
+/* Viewfinder */
+.vf{position:absolute;inset:0;pointer-events:none;z-index:3}
+.vf-mask{position:absolute;background:rgba(0,0,0,.5)}
+.vf-mask.t{top:0;left:0;right:0;height:20%}
+.vf-mask.b{bottom:0;left:0;right:0;height:20%}
+.vf-mask.l{top:20%;bottom:20%;left:0;width:5%}
+.vf-mask.r{top:20%;bottom:20%;right:0;width:5%}
+.vf-frame{position:absolute;top:20%;left:5%;right:5%;bottom:20%;border:1.5px solid rgba(255,255,255,.25)}
+.corner{position:absolute;width:16px;height:16px;border-color:var(--accent);border-style:solid}
+.corner.tl{top:-1px;left:-1px;border-width:2px 0 0 2px}
+.corner.tr{top:-1px;right:-1px;border-width:2px 2px 0 0}
+.corner.bl{bottom:-1px;left:-1px;border-width:0 0 2px 2px}
+.corner.br{bottom:-1px;right:-1px;border-width:0 2px 2px 0}
+.scanline{position:absolute;left:5%;right:5%;height:1.5px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 6px var(--accent);animation:scan 2.5s ease-in-out infinite;top:20%}
+@keyframes scan{0%{top:20%;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:80%;opacity:0}}
+.scanline.hide{display:none}
+.vf-label{position:absolute;bottom:21%;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:2px;color:#fff;background:rgba(0,0,0,.6);padding:3px 12px;border-radius:3px;white-space:nowrap}
 
-        #start-cam-btn {
-            position: absolute; z-index: 50; padding: 15px 30px; font-size: 16px; font-weight: bold;
-            background-color: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer;
-        }
+/* Processing overlay */
+.proc{position:absolute;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:10}
+.proc.show{display:flex}
+.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-txt{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,.7)}
 
-        #action-bar { height: 80px; background-color: var(--surface-color); display: flex; justify-content: center; align-items: center; position: relative; z-index: 30; }
-        #capture-btn { width: 64px; height: 64px; border-radius: 50%; background-color: #555; border: 4px solid var(--surface-color); outline: 2px solid #555; cursor: pointer; transition: transform 0.1s; pointer-events: none; }
-        #capture-btn.active { background-color: var(--primary-color); outline-color: var(--primary-color); pointer-events: auto; }
-        #capture-btn:active { transform: scale(0.95); }
+/* ACTION BAR */
+.action-bar{flex-shrink:0;height:88px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:24px}
+.btn-capture{width:68px;height:68px;border-radius:50%;background:var(--surface2);border:3px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .1s,border-color .2s;pointer-events:none;opacity:.4}
+.btn-capture.ready{background:var(--accent);border-color:var(--accent);opacity:1;pointer-events:auto;box-shadow:0 0 20px rgba(0,191,165,.4)}
+.btn-capture:active{transform:scale(.93)}
+.btn-capture svg{pointer-events:none}
+.btn-zip{padding:12px 18px;background:var(--accent2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:opacity .15s}
+.btn-zip:disabled{opacity:.3;cursor:not-allowed}
+.btn-zip:active{opacity:.8}
 
-        #list-container { flex: 1; background-color: var(--surface-color); padding: 15px; overflow-y: auto; z-index: 30; }
-        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; }
-        .header-row h2 { font-size: 16px; font-weight: 600; color: var(--text-muted); }
-        .counter { background-color: var(--primary-color); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 14px; font-weight: bold; }
+/* RESULT SHEET */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:50;display:none;align-items:flex-end}
+.sheet-bg.show{display:flex;animation:fdin .2s}
+@keyframes fdin{from{opacity:0}to{opacity:1}}
+.sheet{width:100%;background:var(--surface);border-radius:16px 16px 0 0;padding:20px 18px 32px;animation:sup .25s ease}
+@keyframes sup{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.sheet-drag{width:32px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px}
+.sheet-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(0,191,165,.1);border:1px solid var(--accent);border-radius:6px;padding:5px 12px;margin-bottom:12px}
+.sheet-tag-dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.sheet-tag-txt{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1px}
+.sheet-pano{font-size:32px;font-weight:700;letter-spacing:2px;margin-bottom:4px}
+.sheet-sip{font-size:11px;color:var(--muted);margin-bottom:16px;font-family:monospace}
+.sheet-fields{display:grid;gap:6px;margin-bottom:18px}
+.sf{display:flex;gap:10px;padding:8px 12px;background:var(--surface2);border-radius:6px}
+.sf-lbl{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:2px;min-width:82px;flex-shrink:0;padding-top:2px}
+.sf-val{font-size:12px;font-family:monospace;color:var(--text);word-break:break-all}
+.sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-save{padding:15px;background:var(--accent);color:#000;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+.btn-retry{padding:15px;background:transparent;color:var(--red);border:1.5px solid var(--red);border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
 
-        #api-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--surface-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; }
-        .modal-content input { width: 100%; padding: 10px; margin-bottom: 15px; background: #333; border: 1px solid #555; color: white; border-radius: 4px; }
-        .modal-content button { width: 100%; padding: 10px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .hidden { display: none !important; }
-    </style>
+/* LIST */
+.list-section{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding:12px 14px 12px}
+.list-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.list-hdr-title{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted)}
+.list-hdr-info{font-size:10px;color:var(--muted);font-family:monospace}
+.pitem{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:8px;padding:12px 14px;margin-bottom:6px;border-left:3px solid var(--accent);animation:itemin .3s ease}
+@keyframes itemin{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.pitem-name{font-size:15px;font-weight:700;color:var(--text)}
+.pitem-sip{font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px}
+.pitem-cnt{font-size:11px;font-weight:700;background:var(--surface2);color:var(--accent);padding:4px 10px;border-radius:12px;white-space:nowrap}
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty-ico{font-size:36px;margin-bottom:10px;opacity:.4}
+.empty-txt{font-size:12px;line-height:1.8}
+
+/* DEBUG */
+#dbg{position:absolute;bottom:89px;left:0;right:0;height:80px;background:rgba(0,0,0,.88);color:#00e676;font-family:monospace;font-size:11px;padding:6px;overflow-y:auto;z-index:20;pointer-events:none}
+</style>
 </head>
 <body>
+<div class="app">
 
-    <div id="debug-log">V10 Korumalı Sürüm Başlatıldı.<br></div>
-
-    <div id="api-modal" class="hidden">
-        <div class="modal-content">
-            <h3>API Ayarları</h3>
-            <input type="text" id="api-key-input" placeholder="AIzaSy...">
-            <button onclick="saveApiKey()">Kaydet ve Başla</button>
-        </div>
+  <!-- API MODAL -->
+  <div class="modal" id="apiModal">
+    <div class="modal-box">
+      <h2>🔑 API Anahtarı</h2>
+      <p>Google AI Studio'dan aldığınız Gemini API anahtarını girin.<br>Anahtar sadece bu cihazda saklanır.</p>
+      <input id="apiInput" type="text" placeholder="AIzaSy..." autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="btn-full" onclick="saveKey()">KAYDET VE BAŞLAT</button>
     </div>
+  </div>
 
-    <div id="camera-container">
-        <button id="start-cam-btn" onclick="startCamera()">KAMERAYI AÇ</button>
-        <video id="camera-feed" playsinline muted></video>
-        <div class="scan-frame"></div>
-        <img id="preview-img" alt="Yakalanan Kare">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-title">ETİKET TARAYICI</div>
+    <div class="hdr-right">
+      <div class="badge on" id="camBadge">HAZIR DEĞİL</div>
+      <div class="badge" id="cntBadge">0 ADET</div>
+      <button class="btn-settings" onclick="showSettings()" title="Ayarlar">⚙</button>
     </div>
+  </div>
 
-    <div id="action-bar">
-        <button id="capture-btn" onclick="captureImage()"></button>
+  <!-- CAMERA -->
+  <div class="cam" id="camSection">
+    <video id="video" playsinline muted autoplay></video>
+    <img id="previewImg" alt="">
+    <div class="vf">
+      <div class="vf-mask t"></div>
+      <div class="vf-mask b"></div>
+      <div class="vf-mask l"></div>
+      <div class="vf-mask r"></div>
+      <div class="vf-frame">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+      </div>
+      <div class="scanline" id="scanline"></div>
+      <div class="vf-label" id="vfLabel">ETİKETİ ÇERÇEVEYE GETİRİN</div>
     </div>
-
-    <div id="list-container">
-        <div class="header-row">
-            <h2>TARANAN PANOLAR</h2>
-            <div class="counter" id="total-count">0</div>
-        </div>
-        <div id="scanned-list" style="color: var(--text-muted); font-size: 14px; text-align: center; margin-top: 20px;">Henüz tarama yapılmadı.</div>
+    <div class="proc" id="proc">
+      <div class="spinner"></div>
+      <div class="proc-txt">GEMİNİ OKUYOR...</div>
     </div>
+  </div>
 
-    <script>
-        const logDiv = document.getElementById('debug-log');
-        function sysLog(msg) {
-            logDiv.innerHTML += `> ${msg}<br>`;
-            logDiv.scrollTop = logDiv.scrollHeight;
-        }
+  <!-- ACTION BAR -->
+  <div class="action-bar">
+    <button class="btn-zip" id="zipBtn" onclick="downloadZip()" disabled>⬇ ZIP</button>
+    <button class="btn-capture" id="captureBtn" onclick="captureAndSend()">
+      <svg width="30" height="30" viewBox="0 0 30 30">
+        <circle cx="15" cy="15" r="11" stroke="white" stroke-width="2.5" fill="none"/>
+        <circle cx="15" cy="15" r="6" fill="white"/>
+      </svg>
+    </button>
+    <button class="btn-zip" style="background:#333;color:var(--muted)" onclick="clearAll()">🗑 SİL</button>
+  </div>
 
-        function checkApiKey() {
-            const apiKey = localStorage.getItem('gemini_api_key');
-            if (!apiKey) {
-                document.getElementById('api-modal').classList.remove('hidden');
-            } else {
-                sysLog("Key hazır. Kamerayı açın.");
-            }
-        }
+  <!-- LIST -->
+  <div class="list-section">
+    <div class="list-hdr">
+      <div class="list-hdr-title">TARANAN PANOLAR</div>
+      <div class="list-hdr-info" id="listInfo">—</div>
+    </div>
+    <div id="panelList">
+      <div class="empty"><div class="empty-ico">📦</div><div class="empty-txt">Henüz tarama yapılmadı<br>Etiketi çerçeveye getirip butona basın</div></div>
+    </div>
+  </div>
 
-        function saveApiKey() {
-            const input = document.getElementById('api-key-input').value.trim();
-            if (input) {
-                localStorage.setItem('gemini_api_key', input);
-                document.getElementById('api-modal').classList.add('hidden');
-                sysLog("Key kaydedildi.");
-            }
-        }
+</div>
 
-        async function startCamera() {
-            const btn = document.getElementById('start-cam-btn');
-            btn.innerText = "Yükleniyor...";
-            const videoElement = document.getElementById('camera-feed');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                videoElement.srcObject = stream;
-                videoElement.onloadedmetadata = () => { 
-                    videoElement.play(); 
-                    sysLog(`Kamera Aktif`);
-                    btn.style.display = "none";
-                    document.getElementById('capture-btn').classList.add('active');
-                };
-            } catch (err) {
-                sysLog("Kamera Hatası: " + err.message);
-                btn.innerText = "TEKRAR DENE";
-            }
-        }
+<!-- RESULT SHEET -->
+<div class="sheet-bg" id="sheetBg">
+  <div class="sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-tag"><div class="sheet-tag-dot"></div><div class="sheet-tag-txt">ETİKET OKUNDU</div></div>
+    <div class="sheet-pano" id="sPano">—</div>
+    <div class="sheet-sip" id="sSip">—</div>
+    <div class="sheet-fields">
+      <div class="sf"><div class="sf-lbl">UPPER LIST</div><div class="sf-val" id="sUpper">—</div></div>
+      <div class="sf"><div class="sf-lbl">PART NO</div><div class="sf-val" id="sPart">—</div></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-save" onclick="confirmSave()">✓ KAYDET</button>
+      <button class="btn-retry" onclick="closeSheet()">✕ TEKRAR</button>
+    </div>
+  </div>
+</div>
 
-        let totalScanned = 0;
+<div id="dbg">BAŞLATILIYOR...<br></div>
 
-        async function captureImage() {
-            const video = document.getElementById('camera-feed');
-            const btn = document.getElementById('capture-btn');
-            const previewImg = document.getElementById('preview-img');
-            const apiKey = localStorage.getItem('gemini_api_key');
+<canvas id="canvas" style="display:none"></canvas>
 
-            if (!apiKey) return;
+<script>
+/* ── STATE ── */
+const ST = { key:'', panels:{}, total:0, blob:null, result:null, busy:false };
 
-            btn.style.backgroundColor = "orange";
-            btn.classList.remove('active');
+/* ── LOG ── */
+const dbg = document.getElementById('dbg');
+function log(m){ dbg.innerHTML += '> '+m+'<br>'; dbg.scrollTop=dbg.scrollHeight; }
 
-            try {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 800;
-                const scaleSize = MAX_WIDTH / video.videoWidth;
-                
-                canvas.width = MAX_WIDTH;
-                canvas.height = video.videoHeight * scaleSize;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-                previewImg.src = dataURL; 
-                previewImg.style.display = "block";
-                
-                const imageData = dataURL.split(',')[1];
-                
-                const promptText = "Görseldeki Siemens etiketini oku. Sadece JSON formatında şu alanları ver: siparis_no, upper_list, part_no, panel_no.";
-                
-                // --- İŞTE KORUMALI URL YÖNTEMİ ---
-                // Tarayıcının kodu bozmasını kesin olarak engellemek için url'yi parçalara ayırıp birleştiriyoruz.
-                const modelStr = "gemini-2.0-flash";
-const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelStr + ":generateContent?key=" + apiKey;
+/* ── API KEY ── */
+function saveKey(){
+  const v = document.getElementById('apiInput').value.trim();
+  if(!v){ alert('Lütfen API anahtarını girin.'); return; }
+  ST.key = v;
+  localStorage.setItem('gk', v);
+  document.getElementById('apiModal').classList.add('hide');
+  log('Key kaydedildi. Kamera başlatılıyor...');
+  startCam();
+}
+function showSettings(){
+  const k = prompt('Yeni Gemini API anahtarı (boş = iptal):','');
+  if(k){ ST.key=k; localStorage.setItem('gk',k); log('Key güncellendi.'); }
+}
+function loadKey(){
+  const k = localStorage.getItem('gk');
+  if(k){ ST.key=k; document.getElementById('apiModal').classList.add('hide'); startCam(); }
+}
 
-                const requestBody = JSON.stringify({
-                    contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }]
-                });
+/* ── CAMERA ── */
+function sizeCam(){
+  const s = document.getElementById('camSection');
+  s.style.height = Math.round(window.innerHeight * 0.42) + 'px';
+}
+window.addEventListener('resize', sizeCam);
 
-                let attempt = 0;
-                let maxAttempts = 3;
-                let success = false;
+async function startCam(){
+  sizeCam();
+  const vid = document.getElementById('video');
+  const constraints = [
+    { video:{ facingMode:{exact:'environment'}, width:{ideal:1280}, height:{ideal:720} } },
+    { video:{ facingMode:'environment' } },
+    { video:true }
+  ];
+  for(const c of constraints){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia(c);
+      vid.srcObject = stream;
+      await new Promise(r => { vid.onloadedmetadata = r; });
+      vid.play();
+      document.getElementById('camBadge').textContent = 'CANLI';
+      document.getElementById('captureBtn').classList.add('ready');
+      log('Kamera aktif: ' + vid.videoWidth + 'x' + vid.videoHeight);
+      return;
+    }catch(e){ log('Kamera denemesi başarısız: '+e.message); }
+  }
+  log('HATA: Kamera açılamadı!');
+}
 
-                while (attempt < maxAttempts && !success) {
-                    attempt++;
-                    sysLog(`İstek atılıyor (Deneme ${attempt}/${maxAttempts})...`);
-                    
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: requestBody
-                    });
+/* ── CAPTURE ── */
+async function captureAndSend(){
+  if(ST.busy) return;
+  ST.busy = true;
 
-                    if (response.status === 503) {
-                        sysLog("Sunucu yoğun (503). Bekleniyor...");
-                        await new Promise(resolve => setTimeout(resolve, 5000));
-                        continue; 
-                    }
+  const vid = document.getElementById('video');
+  const cvs = document.getElementById('canvas');
+  const prev = document.getElementById('previewImg');
 
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        sysLog(`API Hatası ${response.status}: ${errorText.substring(0,40)}`);
-                        break; 
-                    }
+  if(!vid.videoWidth){ ST.busy=false; log('Kamera hazır değil.'); return; }
 
-                    const data = await response.json();
-                    
-                    if (data.error) {
-                        sysLog("API REDDETTİ: " + data.error.message);
-                        break;
-                    }
-                    
-                    if (data.candidates && data.candidates[0].content) {
-                        let rawText = data.candidates[0].content.parts[0].text;
-                        let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                        try {
-                            let result = JSON.parse(cleanText);
-                            let panoNo = result.panel_no || "Accessories Kit";
-                            if (panoNo.toString().trim() === "") panoNo = "Accessories Kit";
-                            sysLog("BAŞARILI: Pano " + panoNo);
-                            addToList(result.siparis_no, panoNo, result.part_no);
-                            success = true; 
-                        } catch (e) {
-                            sysLog("JSON Hatası: " + cleanText.substring(0, 20));
-                            break;
-                        }
-                    } else {
-                        sysLog("Yanıt Boş.");
-                        break;
-                    }
-                }
+  // Görüntüyü 600px'e sıkıştır — API için optimum boyut
+  const MAX = 600;
+  const scale = Math.min(1, MAX / vid.videoWidth);
+  cvs.width  = Math.round(vid.videoWidth * scale);
+  cvs.height = Math.round(vid.videoHeight * scale);
+  const ctx = cvs.getContext('2d');
+  ctx.drawImage(vid, 0, 0, cvs.width, cvs.height);
 
-                if (!success && attempt >= maxAttempts) {
-                    sysLog("HATA: Tüm denemeler başarısız oldu.");
-                }
+  // Preview göster
+  const dataURL = cvs.toDataURL('image/jpeg', 0.75);
+  prev.src = dataURL;
+  prev.style.display = 'block';
 
-            } catch (error) {
-                sysLog("ÇÖKME: " + error.message);
-            } finally {
-                setTimeout(() => { previewImg.style.display = "none"; }, 1500);
-                btn.style.backgroundColor = "";
-                btn.classList.add('active');
-            }
-        }
+  // Blob kaydet
+  ST.blob = await new Promise(r => cvs.toBlob(r, 'image/jpeg', 0.85));
+  const b64 = dataURL.split(',')[1];
 
-        function addToList(siparis, pano, parca) {
-            const listContainer = document.getElementById('scanned-list');
-            if (totalScanned === 0) listContainer.innerHTML = "";
-            totalScanned++;
-            document.getElementById('total-count').innerText = totalScanned;
-            const item = document.createElement('div');
-            item.style.backgroundColor = "#2a2a2a"; item.style.padding = "10px"; item.style.marginBottom = "10px"; item.style.borderRadius = "6px"; item.style.borderLeft = "4px solid var(--primary-color)";
-            item.innerHTML = "<div style='font-weight: bold; color: white; margin-bottom: 4px;'>Pano: " + pano + "</div><div style='font-size: 12px; color: var(--text-muted);'>Sipariş: " + siparis + " | Parça: " + parca + "</div>";
-            listContainer.prepend(item);
-        }
+  // UI
+  document.getElementById('proc').classList.add('show');
+  document.getElementById('scanline').classList.add('hide');
+  document.getElementById('vfLabel').textContent = 'GEMİNİ OKUYOR...';
+  document.getElementById('captureBtn').classList.remove('ready');
 
-        window.onload = checkApiKey;
-    </script>
+  try{
+    const res = await callGemini(b64);
+    document.getElementById('proc').classList.remove('show');
+    prev.style.display = 'none';
+    if(res){
+      showSheet(res);
+    } else {
+      log('Etiket okunamadı. Tekrar deneyin.');
+      resetUI();
+    }
+  } catch(e){
+    document.getElementById('proc').classList.remove('show');
+    prev.style.display = 'none';
+    log('HATA: ' + e.message);
+    resetUI();
+  }
+  ST.busy = false;
+}
+
+/* ── GEMINI API ── */
+async function callGemini(b64){
+  const prompt = `Bu fotoğrafta bir Siemens aksesuar etiketi var. Şu bilgileri JSON olarak çıkar:
+- siparis_no: En üstteki 10 haneli sipariş numarası (70 ile başlar, örnek: 7024055700)
+- upper_list: "UPPER LIST:" satırındaki parça kodu (8PQ ile başlar)
+- part_no: "PART NO:" satırındaki parça kodu (8PQ ile başlar)
+- panel_no: "PANEL NO:" satırındaki değer (sadece sayı, örnek: 1 veya 2)
+
+Eğer PANEL NO boşsa veya okunamazsa "Accessories Kit" yaz.
+SADECE JSON döndür, başka hiçbir şey yazma:
+{"siparis_no":"...","upper_list":"...","part_no":"...","panel_no":"..."}`;
+
+  const url = [
+    'https://generativelanguage.googleapis.com',
+    '/v1beta/models/gemini-2.0-flash:generateContent?key=',
+    ST.key
+  ].join('');
+
+  // Exponential backoff: 429 gelirse bekle, tekrar dene
+  const delays = [0, 8000, 15000];
+  
+  for(let i=0; i<delays.length; i++){
+    if(delays[i] > 0){
+      log('Rate limit. ' + (delays[i]/1000) + 'sn bekleniyor...');
+      await sleep(delays[i]);
+    }
+    
+    log('İstek gönderiliyor (deneme ' + (i+1) + '/' + delays.length + ')...');
+    
+    let resp;
+    try{
+      resp = await fetch(url, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents:[{ parts:[
+            { text: prompt },
+            { inline_data:{ mime_type:'image/jpeg', data:b64 } }
+          ]}],
+          generationConfig:{ maxOutputTokens:200, temperature:0 }
+        })
+      });
+    } catch(e){
+      log('Ağ hatası: '+e.message);
+      continue;
+    }
+
+    if(resp.status === 429){
+      log('Rate limit (429) alındı.');
+      continue; // retry
+    }
+    if(resp.status === 503){
+      log('Sunucu yoğun (503).');
+      continue;
+    }
+    if(!resp.ok){
+      const t = await resp.text();
+      log('API hatası ' + resp.status + ': ' + t.slice(0,60));
+      return null;
+    }
+
+    const data = await resp.json();
+    
+    if(data.error){ log('API reddetti: '+data.error.message); return null; }
+    
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    log('Yanıt: ' + raw.slice(0,60));
+    
+    const clean = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+    try{
+      const j = JSON.parse(clean.match(/\{[\s\S]*\}/)[0]);
+      if(!j.panel_no || j.panel_no.toString().trim() === '') j.panel_no = 'Accessories Kit';
+      if(!j.siparis_no){ log('Sipariş no okunamadı.'); return null; }
+      return j;
+    } catch(e){
+      log('JSON parse hatası: ' + clean.slice(0,40));
+      return null;
+    }
+  }
+  log('Tüm denemeler başarısız.');
+  return null;
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ── SHEET ── */
+function showSheet(r){
+  ST.result = r;
+  const panel = r.panel_no === 'Accessories Kit' ? 'ACCESSORIES KIT' : 'PANO ' + r.panel_no;
+  document.getElementById('sPano').textContent   = panel;
+  document.getElementById('sSip').textContent    = r.siparis_no || '—';
+  document.getElementById('sUpper').textContent  = r.upper_list || '—';
+  document.getElementById('sPart').textContent   = r.part_no    || '—';
+  document.getElementById('sheetBg').classList.add('show');
+}
+
+function confirmSave(){
+  const r = ST.result;
+  if(!r) return;
+  
+  const panoPad = r.panel_no === 'Accessories Kit'
+    ? 'Accessories_Kit'
+    : 'Pano_' + String(r.panel_no).padStart(2,'0');
+  const key = (r.siparis_no || 'BILINMIYOR') + '_' + panoPad;
+  
+  if(!ST.panels[key]) ST.panels[key] = [];
+  const idx = ST.panels[key].length + 1;
+  ST.panels[key].push({
+    name: key + '_' + String(idx).padStart(3,'0') + '.jpg',
+    blob: ST.blob
+  });
+  ST.total++;
+  
+  log('KAYIT: ' + key + ' (' + idx + '. foto)');
+  document.getElementById('cntBadge').textContent = ST.total + ' ADET';
+  document.getElementById('zipBtn').disabled = false;
+  
+  renderList(key);
+  closeSheet();
+}
+
+function closeSheet(){
+  document.getElementById('sheetBg').classList.remove('show');
+  ST.result = null; ST.blob = null;
+  resetUI();
+}
+
+function resetUI(){
+  document.getElementById('scanline').classList.remove('hide');
+  document.getElementById('vfLabel').textContent = 'ETİKETİ ÇERÇEVEYE GETİRİN';
+  document.getElementById('captureBtn').classList.add('ready');
+}
+
+/* ── LIST ── */
+function renderList(newKey){
+  const list = document.getElementById('panelList');
+  const keys = Object.keys(ST.panels).sort();
+  document.getElementById('listInfo').textContent = ST.total + ' foto / ' + keys.length + ' pano';
+  if(!keys.length){
+    list.innerHTML='<div class="empty"><div class="empty-ico">📦</div><div class="empty-txt">Henüz tarama yapılmadı</div></div>';
+    return;
+  }
+  list.innerHTML = keys.map(k=>{
+    const sp = k.indexOf('_Pano_');
+    const spA = k.indexOf('_Accessories_Kit');
+    let sip, pano;
+    if(sp > -1){ sip=k.slice(0,sp); pano='PANO '+k.slice(sp+6).replace(/^0+/,''); }
+    else if(spA > -1){ sip=k.slice(0,spA); pano='ACCESSORIES KIT'; }
+    else { sip=k; pano=k; }
+    const cnt = ST.panels[k].length;
+    return `<div class="pitem">
+      <div><div class="pitem-name">${pano}</div><div class="pitem-sip">${sip}</div></div>
+      <div class="pitem-cnt">${cnt} foto</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── ZIP ── */
+async function downloadZip(){
+  const btn = document.getElementById('zipBtn');
+  btn.textContent = '...'; btn.disabled = true;
+  try{
+    const zip = new JSZip();
+    for(const [key,files] of Object.entries(ST.panels)){
+      const folder = zip.folder(key);
+      for(const f of files) folder.file(f.name, f.blob);
+    }
+    const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Etiketler_' + new Date().toISOString().slice(0,10) + '.zip';
+    a.click();
+    log('ZIP indirildi.');
+  }catch(e){ log('ZIP hatası: '+e.message); }
+  btn.textContent = '⬇ ZIP'; btn.disabled = false;
+}
+
+/* ── CLEAR ── */
+function clearAll(){
+  if(!Object.keys(ST.panels).length) return;
+  if(!confirm('Tüm taranan etiketler silinecek?')) return;
+  ST.panels={}; ST.total=0;
+  document.getElementById('cntBadge').textContent='0 ADET';
+  document.getElementById('zipBtn').disabled=true;
+  renderList(null);
+  log('Temizlendi.');
+}
+
+/* ── INIT ── */
+loadKey();
+</script>
 </body>
 </html>
