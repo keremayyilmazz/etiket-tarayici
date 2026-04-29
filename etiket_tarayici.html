@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Panel Aksesuar Tarayıcı - V7</title>
+    <title>Siemens Etiket Tarayıcı - V8 (Endüstriyel)</title>
     <style>
         :root {
             --bg-color: #121212; --surface-color: #1e1e1e;
@@ -53,7 +53,7 @@
 </head>
 <body>
 
-    <div id="debug-log">V7 Başlatıldı. Model Güncellendi.<br></div>
+    <div id="debug-log">V8 (Auto-Retry) Başlatıldı.<br></div>
 
     <div id="api-modal" class="hidden">
         <div class="modal-content">
@@ -76,7 +76,7 @@
 
     <div id="list-container">
         <div class="header-row">
-            <h2>TARANAN ETİKETLER</h2>
+            <h2>TARANAN PANOLAR</h2>
             <div class="counter" id="total-count">0</div>
         </div>
         <div id="scanned-list" style="color: var(--text-muted); font-size: 14px; text-align: center; margin-top: 20px;">Henüz tarama yapılmadı.</div>
@@ -155,47 +155,80 @@
                 previewImg.style.display = "block";
                 
                 const imageData = dataURL.split(',')[1];
-                sysLog(`İstek atılıyor...`);
-
+                
                 const promptText = "Görseldeki Siemens etiketini oku. Sadece JSON formatında şu alanları ver: siparis_no, upper_list, part_no, panel_no.";
+                const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
-                // MODEL İSMİ BURADA GÜNCELLENDİ (gemini-2.5-flash)
-                const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }]
-                    })
+                const requestBody = JSON.stringify({
+                    contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: "image/jpeg", data: imageData } }] }]
                 });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    sysLog(`API Hatası: ${errorText.substring(0,60)}`);
-                    return;
+                // HATA TOLERANSI: 3 Kez Deneme Döngüsü
+                let attempt = 0;
+                let maxAttempts = 3;
+                let success = false;
+
+                while (attempt < maxAttempts && !success) {
+                    attempt++;
+                    sysLog(`İstek atılıyor (Deneme ${attempt}/${maxAttempts})...`);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: requestBody
+                    });
+
+                    // Eğer sunucu yoğunsa (503) bekle ve tekrar dene
+                    if (response.status === 503) {
+                        sysLog("Sunucu yoğun (503). 1 saniye bekleniyor...");
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        continue; 
+                    }
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        sysLog(`API Hatası ${response.status}: ${errorText.substring(0,40)}`);
+                        break; // 503 dışındaki hatalarda döngüyü kır
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        if (data.error.code === 503) {
+                            sysLog("Sunucu meşgul. Bekleniyor...");
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            continue;
+                        } else {
+                            sysLog("API REDDETTİ: " + data.error.message);
+                            break;
+                        }
+                    }
+                    
+                    // Veriyi Başarıyla Okuduk
+                    if (data.candidates && data.candidates[0].content) {
+                        let rawText = data.candidates[0].content.parts[0].text;
+                        let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                        try {
+                            let result = JSON.parse(cleanText);
+                            let panoNo = result.panel_no || "Accessories Kit";
+                            if (panoNo.toString().trim() === "") panoNo = "Accessories Kit";
+                            sysLog("BAŞARILI: Pano " + panoNo);
+                            addToList(result.siparis_no, panoNo, result.part_no);
+                            success = true; // Döngüden çık
+                        } catch (e) {
+                            sysLog("JSON Hatası: " + cleanText.substring(0, 20));
+                            break;
+                        }
+                    } else {
+                        sysLog("Yanıt Boş.");
+                        break;
+                    }
                 }
 
-                const data = await response.json();
-                
-                if (data.error) {
-                    sysLog("API REDDETTİ: " + data.error.message);
-                    return;
+                if (!success && attempt >= maxAttempts) {
+                    sysLog("HATA: Sunucu şu an çok yoğun, lütfen birazdan tekrar deneyin.");
                 }
-                
-                if (data.candidates && data.candidates[0].content) {
-                    let rawText = data.candidates[0].content.parts[0].text;
-                    let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    try {
-                        let result = JSON.parse(cleanText);
-                        let panoNo = result.panel_no || "Accessories Kit";
-                        if (panoNo.toString().trim() === "") panoNo = "Accessories Kit";
-                        sysLog("BAŞARILI: Pano " + panoNo);
-                        addToList(result.siparis_no, panoNo, result.part_no);
-                    } catch (e) {
-                        sysLog("JSON Hatası: " + cleanText.substring(0, 20));
-                    }
-                } else {
-                    sysLog("Yanıt Boş.");
-                }
+
             } catch (error) {
                 sysLog("ÇÖKME: " + error.message);
             } finally {
