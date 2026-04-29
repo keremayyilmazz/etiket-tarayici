@@ -186,7 +186,7 @@ const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + mode
 
                     if (response.status === 503) {
                         sysLog("Sunucu yoğun (503). Bekleniyor...");
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        await new Promise(resolve => setTimeout(resolve, 5000));
                         continue; 
                     }
 
