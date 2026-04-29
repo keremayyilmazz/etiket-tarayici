@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Panel Aksesuar Tarayıcı - V5</title>
+    <title>Panel Aksesuar Tarayıcı - V6</title>
     <style>
         :root {
             --bg-color: #121212; --surface-color: #1e1e1e;
@@ -15,7 +15,7 @@
 
         #debug-log {
             position: absolute; bottom: 80px; left: 0; width: 100%; height: 90px; 
-            background: rgba(0, 0, 0, 0.8); color: #ffeb3b; font-family: monospace; 
+            background: rgba(0, 0, 0, 0.85); color: #00e676; font-family: monospace; 
             font-size: 11px; padding: 5px; overflow-y: auto; z-index: 9999; pointer-events: none;
         }
 
@@ -53,12 +53,11 @@
 </head>
 <body>
 
-    <div id="debug-log">V5 Yüklendi. API Yanıtları bekleniyor...<br></div>
+    <div id="debug-log">V6 Başlatıldı. Sıkıştırma Aktif.<br></div>
 
     <div id="api-modal" class="hidden">
         <div class="modal-content">
             <h3>API Ayarları</h3>
-            <p style="font-size: 12px; margin-bottom: 10px; color: #aaa;">Mevcut API Key hatalı olabilir, lütfen tekrar girin.</p>
             <input type="text" id="api-key-input" placeholder="AIzaSy...">
             <button onclick="saveApiKey()">Kaydet ve Başla</button>
         </div>
@@ -90,14 +89,12 @@
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        // V5'e geçerken eski hatalı API key'i silelim ki sana tekrar sorsun
         function checkApiKey() {
-            sysLog("Sistem kontrol ediliyor...");
             const apiKey = localStorage.getItem('gemini_api_key');
             if (!apiKey) {
                 document.getElementById('api-modal').classList.remove('hidden');
             } else {
-                sysLog("Kayıtlı API Key bulundu. Kamera butonuna basın.");
+                sysLog("Key hazır. Kamerayı açın.");
             }
         }
 
@@ -106,7 +103,7 @@
             if (input) {
                 localStorage.setItem('gemini_api_key', input);
                 document.getElementById('api-modal').classList.add('hidden');
-                sysLog("Yeni API Key kaydedildi.");
+                sysLog("Key kaydedildi.");
             }
         }
 
@@ -119,7 +116,7 @@
                 videoElement.srcObject = stream;
                 videoElement.onloadedmetadata = () => { 
                     videoElement.play(); 
-                    sysLog("Kamera açık.");
+                    sysLog(`Kamera Aktif (${videoElement.videoWidth}x${videoElement.videoHeight})`);
                     btn.style.display = "none";
                     document.getElementById('capture-btn').classList.add('active');
                 };
@@ -146,15 +143,27 @@
             btn.classList.remove('active');
 
             try {
+                // --- İŞTE YENİ SIKIŞTIRMA MANTIĞI ---
                 const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                const MAX_WIDTH = 800; // Genişliği 800 piksele zorluyoruz
+                const scaleSize = MAX_WIDTH / video.videoWidth;
                 
-                const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-                previewImg.src = dataURL; previewImg.style.display = "block";
+                canvas.width = MAX_WIDTH;
+                canvas.height = video.videoHeight * scaleSize;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Kaliteyi %70'e düşürüyoruz (Metin okumak için fazlasıyla yeterli)
+                const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+                previewImg.src = dataURL; 
+                previewImg.style.display = "block";
+                
                 const imageData = dataURL.split(',')[1];
                 
-                sysLog("İstek gönderildi, bekleniyor...");
+                // Veri boyutunu loga yazdıralım ki küçüldüğünü görelim
+                const kbSize = Math.round((imageData.length * 3 / 4) / 1024);
+                sysLog(`Veri: ${kbSize} KB. API'ye iletiliyor...`);
 
                 const promptText = "Görseldeki Siemens etiketini oku. Sadece JSON formatında şu alanları ver: siparis_no, upper_list, part_no, panel_no.";
 
@@ -166,17 +175,24 @@
                     })
                 });
 
+                // Google'dan HTTP düzeyinde hata gelirse (Örn: 400 Bad Request)
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    sysLog(`HTTP Hatası ${response.status}: ${errorText.substring(0,40)}`);
+                    return;
+                }
+
                 const data = await response.json();
                 
-                // İŞTE KRİTİK NOKTA: Google'ın hata mesajını yakaladığımız yer
                 if (data.error) {
-                    sysLog("GOOGLE API REDDETTİ: " + data.error.message);
-                    return; // İşlemi burada durdur
+                    sysLog("API REDDETTİ: " + data.error.message);
+                    return;
                 }
                 
                 if (data.candidates && data.candidates[0].content) {
                     let rawText = data.candidates[0].content.parts[0].text;
-                    let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    let cleanText = rawText.replace(/```json/gi, '').replace(/
+```/g, '').trim();
                     try {
                         let result = JSON.parse(cleanText);
                         let panoNo = result.panel_no || "Accessories Kit";
@@ -187,10 +203,11 @@
                         sysLog("JSON Hatası: " + cleanText.substring(0, 20));
                     }
                 } else {
-                    sysLog("Bilinmeyen Hata. Data: " + JSON.stringify(data).substring(0, 50));
+                    sysLog("Yanıt Boş. Veri: " + JSON.stringify(data).substring(0, 30));
                 }
             } catch (error) {
-                sysLog("Bağlantı Hatası: " + error.message);
+                // Fetch tamamen çökerse (Ağ veya Timeout) hatanın adını da gösterelim
+                sysLog("ÇÖKME: " + error.name + " - " + error.message);
             } finally {
                 setTimeout(() => { previewImg.style.display = "none"; }, 1500);
                 btn.style.backgroundColor = "";
@@ -209,11 +226,7 @@
             listContainer.prepend(item);
         }
 
-        // Uygulama açılırken eski key'i temizleyip sıfırdan soralım (Emin olmak için)
-        window.onload = () => {
-            localStorage.removeItem('gemini_api_key');
-            checkApiKey();
-        };
+        window.onload = checkApiKey;
     </script>
 </body>
 </html>
